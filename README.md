@@ -6,21 +6,39 @@ PulseLab is an academic research prototype for ECG signal processing, Rough Set 
 
 ## Current release
 
-**Version 0.3.0 — Phase 3: Real MIT-BIH Validation**
+**Version 0.4.0 — Phase 4: Unified Browser + Python Research API**
 
-Phase 3 adds dataset integrity and provenance audits, a stricter patient-disjoint default split, automatic R-peak feature extraction, separate R-peak detector validation, per-record classification results, record-cluster confidence intervals and a reproducible report. The browser workspace continues to use its own synthetic demonstration data; it is not silently connected to the Python research models.
+Phase 4 adds a local FastAPI service and connects it to the Apple-inspired browser workspace. From the new **Research Backend** section, users can check dependencies, inspect MIT-BIH dataset availability, launch dataset audits, run reproducible Python experiments, monitor job progress, browse saved runs and download reports. The original browser ECG Analysis / Rough Set / Fuzzy demonstration remains explicitly synthetic; its predictions and metrics are not relabelled as MIT-BIH outputs.
 
-## 1. Run the Apple-inspired browser workspace
+## 1. Run the integrated PulseLab application (recommended)
 
-The static browser workspace requires no npm install or build step:
+Phase 4 serves the browser interface and Python API from the same local origin. From the repository root in Windows PowerShell:
+
+```powershell
+py -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
+pip install -r requirements.txt
+py -m uvicorn server:app --host 127.0.0.1 --port 8000
+```
+
+Open <http://127.0.0.1:8000/web/>. The API health check is at <http://127.0.0.1:8000/api/health> and interactive API documentation is at <http://127.0.0.1:8000/api/docs>.
+
+The new **Research Backend** navigation page checks the API and dependency status, audits local MIT-BIH files, runs independent R-peak validation, launches classifier experiments, tracks job progress, lists saved experiment runs, and downloads audit / validation / experiment artifacts.
+
+The existing browser ECG Analysis, Feature Extraction, Rough Set, Fuzzy Logic and Model Evaluation pages still run the separate synthetic demonstration. Those client-side scores are never presented as MIT-BIH experiment results. The browser UI retains responsive layouts and persistent light / dark themes.
+
+> Security: the API has no authentication and is intended for local use only. Keep Uvicorn bound to `127.0.0.1`; do not expose it to a public network.
+
+### Optional: run only the static synthetic browser demo
+
+For UI-only development, the browser can still be served without the Python API:
 
 ```powershell
 py -m http.server 8000
 ```
 
-Open <http://localhost:8000/web/>.
-
-The browser workspace supports responsive layouts and persistent light/dark themes. Its models are trained on synthetic ECG generated in the browser. The page marks the environment as simulated. It is not the real MIT-BIH experiment console.
+Open <http://localhost:8000/web/>. The Research Backend page will correctly show that the API is offline in this mode.
 
 ## 2. Set up the Python research engine
 
@@ -142,6 +160,8 @@ py -m pytest -q
 node tests/browser_core_smoke.test.js
 ```
 
+Phase 4 adds API integration tests covering health / dependency reporting, dataset status, frontend static serving, dataset-audit job handling, missing-data experiment errors and artifact path validation.
+
 The Python tests use deterministic synthetic records / feature tables and dependency-injected detector functions for unit testing. They verify the algorithms and report generation; they do not substitute for running the full MIT-BIH dataset experiment.
 
 ## Outputs
@@ -195,7 +215,8 @@ A single MIT-BIH split, even with record-cluster intervals, is not external vali
 
 ```text
 config.py                    Shared configuration, AAMI mapping and split protocols
-app.py                       Phase 3 Streamlit research console
+app.py                        Streamlit research console (alternative UI)
+server.py                     Phase 4 FastAPI service + static web host
 train.py                     MIT-BIH classification CLI
 audit_dataset.py             Dataset integrity / provenance audit CLI
 validate_rpeaks.py           Standalone R-peak validation CLI

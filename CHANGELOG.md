@@ -1,5 +1,18 @@
 # Changelog
 
+
+## 0.4.0 — Phase 4: Unified browser and Python API
+
+- Added a local FastAPI service that serves the web UI and exposes health, dependency and MIT-BIH dataset status endpoints.
+- Added asynchronous dataset-audit and experiment jobs with progress tracking and persisted outputs.
+- Added saved-run discovery, experiment summaries and safe JSON / CSV / Markdown artifact downloads.
+- Added a Research Backend page to the Apple-inspired browser interface.
+- Added frontend integration while keeping synthetic browser demonstrations explicitly separate from real MIT-BIH results.
+- Added API tests for health checks, static serving, dataset status, background job outcomes and artifact path validation.
+- Added FastAPI, Uvicorn and HTTPX dependencies.
+- API is intended for local loopback use only; it does not provide authentication.
+
+
 ## 0.3.0 — Phase 3: Real MIT-BIH Validation
 
 - Added dataset integrity and provenance auditing for WFDB files, annotation counts, AAMI class support and SHA-256 checksums.

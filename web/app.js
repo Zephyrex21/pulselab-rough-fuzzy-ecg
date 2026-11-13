@@ -7,7 +7,8 @@ const PAGES={
  features:{label:'Feature Extraction',eyebrow:'BEAT CHARACTERISATION',title:'From waveform to measurable features.',subtitle:'Inspect beat-level descriptors and understand which attributes are retained by the current rough-set reduct.'},
  rough:{label:'Rough Set Analysis',eyebrow:'FEATURE REDUCTION',title:'Find the smallest informative feature set.',subtitle:'Explore discretisation, dependency degree, the QuickReduct search path and core attributes.'},
  fuzzy:{label:'Fuzzy Logic Engine',eyebrow:'INTERPRETABLE CLASSIFICATION',title:'See how fuzzy rules reach a decision.',subtitle:'Inspect learned membership functions, rule antecedents, firing strengths and class-level aggregation.'},
- eval:{label:'Model Evaluation',eyebrow:'EXPERIMENTAL RESULTS',title:'Compare models with the right context.',subtitle:'Review synthetic held-out results, confusion matrices and per-class performance. These metrics are not clinical evidence.'}
+ eval:{label:'Model Evaluation',eyebrow:'EXPERIMENTAL RESULTS',title:'Compare models with the right context.',subtitle:'Review synthetic held-out results, confusion matrices and per-class performance. These metrics are not clinical evidence.'},
+ backend:{label:'Research Backend',eyebrow:'PYTHON RESEARCH SERVICE',title:'Connect the interface to real experiments.',subtitle:'Check the local Python API, audit MIT-BIH files, launch reproducible experiments and inspect saved research results.'}
 };
 const NAV_ICON={
  overview:'<svg viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.5"/></svg>',
@@ -15,7 +16,8 @@ const NAV_ICON={
  features:'<svg viewBox="0 0 24 24"><path d="M4 19V5M4 19h16M8 15l3-4 3 2 5-7"/><circle cx="8" cy="15" r="1"/><circle cx="11" cy="11" r="1"/><circle cx="14" cy="13" r="1"/></svg>',
  rough:'<svg viewBox="0 0 24 24"><path d="M12 3 4 7.5 12 12l8-4.5L12 3Z"/><path d="m4 12 8 4.5 8-4.5M4 16.5 12 21l8-4.5"/></svg>',
  fuzzy:'<svg viewBox="0 0 24 24"><path d="M3 18c3-10 5-10 8 0s5 10 10-12"/><path d="M3 6h18" stroke-dasharray="2 3"/></svg>',
- eval:'<svg viewBox="0 0 24 24"><path d="M4 19V5M4 19h16"/><rect x="7" y="11" width="3" height="6" rx=".7"/><rect x="12" y="8" width="3" height="9" rx=".7"/><rect x="17" y="4" width="3" height="13" rx=".7"/></svg>'
+ eval:'<svg viewBox="0 0 24 24"><path d="M4 19V5M4 19h16"/><rect x="7" y="11" width="3" height="6" rx=".7"/><rect x="12" y="8" width="3" height="9" rx=".7"/><rect x="17" y="4" width="3" height="13" rx=".7"/></svg>',
+ backend:'<svg viewBox="0 0 24 24"><path d="M4 5h16v11H4zM8 20h8M12 16v4"/><path d="M8 9h8M8 12h5"/></svg>'
 };
 $('#nav').innerHTML=Object.entries(PAGES).map(([k,v])=>`<button class="nav-item ${k==='overview'?'on':''}" type="button" data-k="${k}" aria-current="${k==='overview'?'page':'false'}">${NAV_ICON[k]}<span>${v.label}</span></button>`).join('');
 $('#nav').onclick=e=>{const b=e.target.closest('button[data-k]');if(b)go(b.dataset.k)};
@@ -24,7 +26,8 @@ $('#theme-toggle').onclick=()=>setTheme(document.documentElement.dataset.theme==
 const closeSidebar=()=>{document.body.classList.remove('sidebar-open');$('#sidebar-toggle').setAttribute('aria-expanded','false')};
 $('#sidebar-toggle').onclick=()=>{const open=!document.body.classList.contains('sidebar-open');document.body.classList.toggle('sidebar-open',open);$('#sidebar-toggle').setAttribute('aria-expanded',String(open))};
 $('#sidebar-backdrop').onclick=closeSidebar;
-function go(k){if(!PAGES[k])return;S.view=k;document.querySelectorAll('#nav button').forEach(b=>{const active=b.dataset.k===k;b.classList.toggle('on',active);b.setAttribute('aria-current',active?'page':'false')});const meta=PAGES[k];$('#breadcrumb-current').textContent=meta.label;$('#page-eyebrow').textContent=meta.eyebrow;$('#page-title').textContent=meta.title;$('#page-subtitle').textContent=meta.subtitle;document.title=`${meta.label} · PulseLab`;$('#v').innerHTML=R[k]();(A[k]||(()=>{}))();closeSidebar()}
+function updateEnvironmentChip(){const chip=$('#environment-chip');if(!chip)return;const label=chip.querySelector('span:last-child'),dot=chip.querySelector('.dataset-chip-dot');const isBackend=S.view==='backend';if(label)label.textContent=isBackend?(S.backendHealth?'PYTHON API CONNECTED':'PYTHON API STATUS'):'SIMULATED DATA';if(dot)dot.style.background=isBackend?(S.backendHealth?'var(--green)':'var(--amber)'):'#d59a3d';}
+function go(k){if(!PAGES[k])return;S.view=k;document.querySelectorAll('#nav button').forEach(b=>{const active=b.dataset.k===k;b.classList.toggle('on',active);b.setAttribute('aria-current',active?'page':'false')});const meta=PAGES[k];$('#breadcrumb-current').textContent=meta.label;$('#page-eyebrow').textContent=meta.eyebrow;$('#page-title').textContent=meta.title;$('#page-subtitle').textContent=meta.subtitle;document.title=`${meta.label} · PulseLab`;updateEnvironmentChip();$('#v').innerHTML=R[k]();(A[k]||(()=>{}))();closeSidebar()}
 function plot(cv,ser,o={}){const d=devicePixelRatio||1,w=cv.clientWidth,h=cv.clientHeight;cv.width=w*d;cv.height=h*d;const g=cv.getContext('2d');g.scale(d,d);
  const win=o.win||8,i0=Math.round((o.t0||0)*E.FS),i1=Math.min(ser[0].y.length,i0+Math.round(win*E.FS));let mn=1e9,mx=-1e9;
  for(const s of ser)for(let i=i0;i<i1;i++){mn=Math.min(mn,s.y[i]);mx=Math.max(mx,s.y[i])}const pad=(mx-mn)*.1||1;mn-=pad;mx+=pad;
@@ -41,7 +44,7 @@ const R={
 overview:()=>{const M=S.M;return`<div class="card"><h2>Hybrid Rough-Fuzzy intelligent system for ECG arrhythmia detection</h2>
 <p>Pipeline: <b>ECG → median-baseline + zero-phase band-pass (0.5–40 Hz) → Pan-Tompkins R-peaks → beat segmentation (−250/+400 ms) → 25 beat features → Rough-Set reduct (QuickReduct) → Fuzzy rule base (Low/Med/High, product t-norm) → AAMI class (N, S, V, F, Q)</b>.</p>
 <div class="grid">${kpi(M.nTrain,'training beats')}${kpi(M.nTest,'held-out test beats')}${kpi(FN.length+' → '+M.rough.reduct.length,'features → rough-set reduct')}${kpi(M.mB.rules.length,'fuzzy rules (model B)')}${kpi(pc(M.evB.acc),'accuracy · B Rough+Fuzzy')}${kpi(pc(M.evA.acc),'accuracy · A Fuzzy (all)')}</div></div>
-<div class="card"><h2>Important — what this web app is</h2><p class="mut">This is a client-side research demonstration (see docs/METHODOLOGY.md). The MIT-BIH database is not bundled, so the models train on <b>synthetic ECG</b> when the page loads. Metrics describe this synthetic benchmark, <b>not</b> MIT-BIH performance. The browser uses 25 single-lead features and Haar wavelets; the Python scaffold has a different feature definition. A CSV upload is processed for exploratory inspection, but class predictions still come from the synthetic-trained model — the upload does not retrain or validate it. Academic prototype; not for diagnosis or clinical decisions.</p></div>
+<div class="card"><h2>Important — what this web app is</h2><p class="mut">This is a client-side research demonstration (see docs/METHODOLOGY.md). The MIT-BIH database is not bundled, so these browser models train on <b>synthetic ECG</b> when the page loads. For real Python experiments, use the Research Backend workspace. Metrics describe this synthetic benchmark, <b>not</b> MIT-BIH performance. The browser uses 25 single-lead features and Haar wavelets; the Python scaffold has a different feature definition. A CSV upload is processed for exploratory inspection, but class predictions still come from the synthetic-trained model — the upload does not retrain or validate it. Academic prototype; not for diagnosis or clinical decisions.</p></div>
 <div class="card"><h2>AAMI classes</h2>${E.CLS.map(c=>`<div>${pill(c)} ${E.CN[c]}</div>`).join('')}</div>`},
 analyze:()=>`<div class="card"><div class="row"><select id="sc">${Object.keys(E.SCEN).map(k=>`<option>${k}</option>`).join('')}</select>
 seed <input id="sd" type="number" value="${S.seed||5}"> noise <select id="nz"><option value=".02">low</option><option value=".05" selected>medium</option><option value=".12">high</option></select>
@@ -85,6 +88,90 @@ fuzzy:()=>{const m=S.M.mB,paint=()=>{const cv=$('#mc'),d=devicePixelRatio||1,w=c
   if(S.rec){const v=S.rec.p.rows[S.sel].f[m.cols[S.fz]];g.setLineDash([4,4]);g.strokeStyle=getComputedStyle(document.documentElement).getPropertyValue('--chart-cursor').trim()||'#fff';g.beginPath();g.moveTo(X(v),0);g.lineTo(X(v),h);g.stroke();g.setLineDash([])}},
  rl=()=>{const k=+$('#rc').value;$('#rl').innerHTML=`<table><tr><th>Class</th><th>IF</th><th>Weight</th></tr>${m.rules.filter(r=>k<0||r.cls===k).map(r=>`<tr><td>${pill(E.CLS[r.cls])}</td><td>${r.ts.map(t=>term(m,t)).join(' AND ')}</td><td>${f4(r.w)}</td></tr>`).join('')}</table>`};
  paint();rl();$('#ff').onchange=e=>{S.fz=+e.target.value;paint()};$('#rc').onchange=rl}};
+// ---------- Phase 4: local Python API integration ----------
+const API_BASE='/api';
+S.backendHealth=null;S.backendDataset=null;S.backendExperiments=[];S.backendJob=null;S.backendResult=null;S.backendRpeakResult=null;S.backendAuditResult=null;S.backendError='';
+const escHtml=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmtPct=v=>(v!==null&&v!==undefined&&Number.isFinite(Number(v)))?(100*Number(v)).toFixed(1)+'%':'—';
+async function apiRequest(path,options={}){
+ const response=await fetch(API_BASE+path,{headers:{'Content-Type':'application/json',...(options.headers||{})},...options});
+ let body={};try{body=await response.json()}catch(_){body={}}
+ if(!response.ok)throw new Error(body.detail||body.message||`API request failed (${response.status})`);
+ return body;
+}
+function backendRender(){
+ const h=S.backendHealth,d=S.backendDataset,j=S.backendJob,rows=S.backendExperiments||[],result=S.backendResult;
+ const status=h?'Connected':'Not connected',busy=!!j&&['queued','running'].includes(j.status); 
+ const deps=h?.dependencies||{};
+ const depRows=Object.entries(deps).map(([n,ok])=>`<tr><td>${escHtml(n.replaceAll('_',' '))}</td><td><span class="pill" style="background:${ok?'#b9f3d6':'#ffe2ad'}">${ok?'Ready':'Missing'}</span></td></tr>`).join('');
+ const jobHtml=j?`<div class="card"><div class="row"><h2 style="margin:0">Current task</h2><span class="pill" id="backend-job-status" style="background:${j.status==='failed'?'#ffd7dc':j.status==='completed'?'#b9f3d6':'#dbeafe'}">${escHtml(j.status)}</span></div><p id="backend-job-message" class="mut">${escHtml(j.message||'Queued')}</p><div class="bar" style="width:${Math.max(0,Math.min(100,Number(j.progress||0)*100))}%;height:9px"></div><p class="mut">${Math.round(Number(j.progress||0)*100)}% · ${escHtml(j.kind||'')}</p>${j.error?`<p style="color:var(--red)">${escHtml(j.error)}</p>`:''}${j.result?`<pre class="api-json">${escHtml(JSON.stringify(j.result,null,2))}</pre>`:''}</div>`:'';
+ const auditReport=S.backendAuditResult?.audit_id?`<div class="card"><h2>Dataset audit: ${escHtml(S.backendAuditResult.audit_id)}</h2><div class="grid">${kpi(S.backendAuditResult.n_records_ok??'—','records readable')}${kpi(S.backendAuditResult.n_records_failed??'—','records failed')}${kpi(S.backendAuditResult.patient_disjoint===true?'Yes':S.backendAuditResult.patient_disjoint===false?'No':'—','patient-disjoint')}</div><div class="row">${(S.backendAuditResult.artifacts||[]).map(a=>`<a class="btn" href="/api/audits/${encodeURIComponent(S.backendAuditResult.audit_id)}/artifacts/${encodeURIComponent(a)}">${escHtml(a)}</a>`).join('')}</div>${S.backendAuditResult.warnings?.length?`<p class="mut">${escHtml(S.backendAuditResult.warnings.join(' · '))}</p>`:''}</div>`:'';
+ const history=rows.length?`<div class="sc"><table><tr><th>Run</th><th>Created (UTC)</th><th>Train</th><th>Test</th><th>Best model</th><th>Macro-F1</th></tr>${rows.map(r=>`<tr><td><button class="btn" data-run-id="${escHtml(r.run_id)}">${escHtml(r.run_id)}</button></td><td>${escHtml((r.created_at_utc||'').replace('T',' ').replace('Z',''))}</td><td>${escHtml(r.n_train??'—')}</td><td>${escHtml(r.n_test??'—')}</td><td>${escHtml(r.best_model?.model||'—')}</td><td>${fmtPct(r.best_model?.macro_f1)}</td></tr>`).join('')}</table></div>`:'<p class="mut">No saved MIT-BIH experiment runs found yet.</p>';
+ const comparison=result?.model_comparison?.length?`<div class="sc"><table><tr><th>Model</th><th>Accuracy</th><th>Balanced accuracy</th><th>Macro-F1</th><th>Weighted-F1</th><th>Features used</th></tr>${result.model_comparison.map(r=>`<tr><td>${escHtml(r.model)}</td><td>${fmtPct(r.accuracy)}</td><td>${fmtPct(r.balanced_accuracy)}</td><td>${fmtPct(r.macro_f1)}</td><td>${fmtPct(r.weighted_f1)}</td><td>${escHtml(r.n_features_used??'—')}</td></tr>`).join('')}</table></div>`:'';
+ const artifacts=result?.artifacts?.length?`<div class="row">${result.artifacts.map(a=>`<a class="btn" href="/api/experiments/${encodeURIComponent(result.run_id)}/artifacts/${encodeURIComponent(a)}" target="_blank" rel="noopener">${escHtml(a)}</a>`).join('')}</div>`:'';
+ return `<div class="card"><div class="row"><h2 style="margin:0">Python research service</h2><span class="pill" style="background:${h?'#b9f3d6':'#ffe2ad'}">${status}</span><button class="btn" id="backend-refresh">Refresh status</button></div><p class="mut">Phase 4 connects this browser workspace to the Python research engine through a local FastAPI service. Start PulseLab with <code>py -m uvicorn server:app --host 127.0.0.1 --port 8000</code> from the project root.</p>${S.backendError?`<p style="color:var(--red)">${escHtml(S.backendError)}</p>`:''}<div class="grid">${kpi(h?escHtml(h.version):'—','API version')}${kpi(h?escHtml(h.python_version):'—','Python runtime')}${kpi(h?escHtml(h.dataset_records_available):'—','MIT-BIH records available')}${kpi(d?`${d.available_requested}/${d.train_records_requested+d.test_records_requested}`:'—','Selected records present')}</div>${h?`<p class="mut">API ready. Dataset root: <code>${escHtml(h.dataset_root)}</code></p>`:'<p class="mut">The browser is currently running without the integrated backend. This is expected when using Python\'s basic http.server; switch to the Uvicorn command above.</p>'}</div>
+ <div class="card"><h2>Local dependency check</h2><div class="sc"><table><tr><th>Dependency</th><th>Status</th></tr>${depRows||'<tr><td colspan="2">Connect to the API to inspect dependencies.</td></tr>'}</table></div><p class="mut">WFDB and PyWavelets are required for MIT-BIH data loading and feature extraction. FastAPI and Uvicorn power this integrated interface.</p></div>
+ <div class="card"><h2>MIT-BIH dataset status</h2><div class="grid">${kpi(d?d.train_records_requested:'—','training records requested')}${kpi(d?d.test_records_requested:'—','test records requested')}${kpi(d?d.available_requested:'—','selected records available')}${kpi(d?d.missing_records.length:'—','selected records missing')}</div><p class="mut">${escHtml(d?.note||'Dataset status is unavailable until the API connects.')}</p>${d?.missing_records?.length?`<p class="mut">Missing: ${escHtml(d.missing_records.join(', '))}</p>`:''}<div class="row"><label>Split <select id="api-split"><option value="patient-disjoint">Patient-disjoint (recommended)</option><option value="de-chazal-record-wise">Historical record-wise (overlap warning)</option></select></label><label><input type="checkbox" id="api-quick" checked> Quick subset</label><label><input type="checkbox" id="api-download"> Download missing records</label><button class="btn" id="api-audit" ${!h||busy?'disabled':''}>Run dataset audit</button></div></div>
+ <div class="card"><h2>Independent R-peak validation</h2><p class="mut">Evaluate the automatic detector against the MIT-BIH reference annotations. These metrics describe peak detection, not arrhythmia classification.</p><div class="row"><label>Matching tolerance (ms) <input id="api-tolerance" type="number" min="25" max="150" step="5" value="75"></label><button class="btn" id="api-rpeak" ${!h||busy?'disabled':''}>Validate test-record R-peaks</button></div>${S.backendRpeakResult?`<div class="grid">${kpi(S.backendRpeakResult.aggregate?.micro_sensitivity==null?'—':fmtPct(S.backendRpeakResult.aggregate.micro_sensitivity),'R-peak sensitivity')}${kpi(S.backendRpeakResult.aggregate?.micro_ppv==null?'—':fmtPct(S.backendRpeakResult.aggregate.micro_ppv),'R-peak PPV')}${kpi(S.backendRpeakResult.aggregate?.micro_f1==null?'—':fmtPct(S.backendRpeakResult.aggregate.micro_f1),'R-peak F1')}${kpi(S.backendRpeakResult.aggregate?.n_records??'—','records evaluated')}</div><p class="mut">${escHtml(S.backendRpeakResult.interpretation||'R-peak detection metrics only.')}</p><div class="row">${['rpeak_validation.json','rpeak_metrics_per_record.csv'].map(a=>`<a class="btn" href="/api/rpeak-validations/${encodeURIComponent(S.backendRpeakResult.validation_id)}/artifacts/${encodeURIComponent(a)}">${a}</a>`).join('')}</div>`:''}</div>
+ <div class="card"><h2>Launch MIT-BIH experiment</h2><p class="mut">This starts the Python experiment pipeline. The quick subset is for engineering checks and may not include every AAMI class; use the full patient-disjoint split for the main research evaluation.</p><div class="row"><label>Peak source <select id="api-peak"><option value="detected">Automatic detected peaks (default)</option><option value="annotations">Annotation-guided benchmark</option></select></label><label><input type="checkbox" id="api-baselines" checked> Include RF / SVM baselines</label><label><input type="checkbox" id="api-save-models" checked> Save model artifacts</label></div><div class="row"><button class="btn pri" id="api-run" ${!h||busy?'disabled':''}>Run selected experiment</button><span class="mut">The dataset must be present locally or downloaded by the job.</span></div></div>
+ ${jobHtml}${auditReport}
+ <div class="card"><div class="row"><h2 style="margin:0">Saved research runs</h2><button class="btn" id="api-history-refresh">Refresh results</button></div>${history}</div>
+ ${result?`<div class="card"><div class="row"><h2 style="margin:0">Experiment: ${escHtml(result.run_id)}</h2><span class="pill" style="background:#b9f3d6">Saved result</span></div><div class="grid">${kpi(result.n_train??'—','training beats')}${kpi(result.n_test??'—','test beats')}${kpi(result.n_features??'—','input features')}${kpi(result.metadata?.patient_disjoint===true?'Yes':result.metadata?.patient_disjoint===false?'No':'—','patient-disjoint')}</div><h2>Model comparison</h2>${comparison||'<p class="mut">No comparison table is available for this run.</p>'}<h2 style="margin-top:18px">Downloadable artifacts</h2>${artifacts}${result.warnings?.length?`<p class="mut">Warnings: ${escHtml(result.warnings.join(' · '))}</p>`:''}<p class="mut">${escHtml(result.disclaimer||'Research use only; not clinically validated.')}</p></div>`:''}
+ <div class="card"><h2>Important separation of results</h2><p class="mut">The existing ECG Analysis, Feature Extraction, Rough Set, Fuzzy and Model Evaluation pages remain a synthetic browser demonstration. This Research Backend page is where real MIT-BIH dataset audits and Python experiment results are managed. A successful API connection does not mean the dataset has been downloaded, and a synthetic benchmark score is never relabelled as MIT-BIH performance.</p><p class="mut"><b>Security:</b> this local research API has no authentication. Keep it bound to 127.0.0.1 and do not expose it to a public network.</p></div>`;
+}
+async function refreshBackend(){
+ S.backendError='';
+ try{
+  const [health,dataset,history]=await Promise.all([apiRequest('/health'),apiRequest('/dataset/status?quick=true'),apiRequest('/experiments?limit=20')]);
+  S.backendHealth=health;S.backendDataset=dataset;S.backendExperiments=history.experiments||[];
+ }catch(err){S.backendHealth=null;S.backendError=err.message;S.backendDataset=null;}
+ updateEnvironmentChip();
+ if(S.view==='backend'){ $('#v').innerHTML=R.backend(); wireBackend(); }
+}
+function wireBackend(){
+ const refresh=$('#backend-refresh');if(refresh)refresh.onclick=refreshBackend;
+ const historyRefresh=$('#api-history-refresh');if(historyRefresh)historyRefresh.onclick=refreshBackend;
+ const audit=$('#api-audit');if(audit)audit.onclick=()=>startBackendJob('audit');
+ const rpeak=$('#api-rpeak');if(rpeak)rpeak.onclick=()=>startBackendJob('rpeak');
+ const run=$('#api-run');if(run)run.onclick=()=>startBackendJob('experiment');
+ document.querySelectorAll('[data-run-id]').forEach(btn=>btn.onclick=()=>loadBackendRun(btn.dataset.runId));
+}
+async function startBackendJob(kind){
+ const split=$('#api-split')?.value||'patient-disjoint',quick=$('#api-quick')?.checked??true,downloadMissing=$('#api-download')?.checked??false;
+ const body=kind==='rpeak'?{split_protocol:split,quick,download_missing:downloadMissing,tolerance_ms:Number($('#api-tolerance')?.value||75)}:kind==='audit'?{split_protocol:split,quick,download_missing:downloadMissing}:{split_protocol:split,quick,download_missing:downloadMissing,peak_source:$('#api-peak')?.value||'detected',include_baselines:$('#api-baselines')?.checked??true,save_models:$('#api-save-models')?.checked??true};
+ const button=kind==='audit'?$('#api-audit'):kind==='rpeak'?$('#api-rpeak'):$('#api-run');if(button)button.disabled=true;
+ try{const route=kind==='audit'?'/dataset/audits':kind==='rpeak'?'/rpeak-validations':'/experiments';const created=await apiRequest(route,{method:'POST',body:JSON.stringify(body)});S.backendJob={job_id:created.job_id,kind:kind==='audit'?'dataset_audit':kind==='rpeak'?'rpeak_validation':'experiment',status:'queued',progress:0,message:'Queued'};S.backendResult=null;renderBackendView();pollBackendJob(created.job_id);}
+ catch(err){S.backendError=err.message;renderBackendView();}
+ finally{if(button)button.disabled=false;}
+}
+function renderBackendView(){if(S.view==='backend'){ $('#v').innerHTML=R.backend();wireBackend();}}
+async function pollBackendJob(jobId){
+ try{
+  const job=await apiRequest(`/jobs/${encodeURIComponent(jobId)}`);S.backendJob=job;
+  const msg=$('#backend-job-message');if(msg)msg.textContent=`${job.message||job.status} · ${Math.round((job.progress||0)*100)}%`;
+  const badge=$('#backend-job-status');if(badge){badge.textContent=job.status;badge.style.background=job.status==='failed'?'#ffd7dc':job.status==='completed'?'#b9f3d6':'#dbeafe';}
+  const panel=msg?.closest('.card');if(panel){const bar=panel.querySelector('.bar');if(bar)bar.style.width=`${Math.max(0,Math.min(100,(job.progress||0)*100))}%`}
+  if(job.status==='completed'){
+   if(job.kind==='experiment'&&job.result?.run_id)await loadBackendRun(job.result.run_id,false);
+   else if(job.kind==='rpeak_validation'&&job.result?.validation_id)await loadRpeakSummary(job.result.validation_id);
+   else S.backendAuditResult=job.result;
+   await refreshBackend();return;
+  }
+  if(job.status==='failed'){renderBackendView();return;}
+  if(job.status==='queued'||job.status==='running')setTimeout(()=>pollBackendJob(jobId),1200);
+ }catch(err){S.backendError=err.message;renderBackendView();}
+}
+async function loadBackendRun(runId,rerender=true){
+ try{S.backendResult=await apiRequest(`/experiments/${encodeURIComponent(runId)}/summary`);if(rerender)renderBackendView();}
+ catch(err){S.backendError=err.message;renderBackendView();}
+}
+async function loadRpeakSummary(validationId){
+ try{S.backendRpeakResult=await apiRequest(`/rpeak-validations/${encodeURIComponent(validationId)}/summary`);}
+ catch(err){S.backendError=err.message;}
+}
+R.backend=backendRender;
+A.backend=()=>{wireBackend();refreshBackend();};
+
 function wire(){draw();$('#t0').oninput=e=>{S.t0=+e.target.value;draw()};$('.sc table').onclick=e=>{const tr=e.target.closest('tr.cl');if(!tr)return;S.sel=+tr.dataset.i;document.querySelectorAll('tr.cl').forEach(r=>r.classList.toggle('sel',r===tr));const t=S.rec.p.rows[S.sel].r/E.FS;if(t<S.t0||t>S.t0+8){S.t0=Math.max(0,Math.min(+$('#t0').max,Math.floor(t-2)));$('#t0').value=S.t0}draw()}}
 setTheme(document.documentElement.dataset.theme==='dark'?'dark':'light');
 addEventListener('keydown',e=>{if(e.key==='Escape')closeSidebar()});

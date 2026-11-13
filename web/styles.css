@@ -273,3 +273,9 @@ tr.cl:hover, tr.sel { background: var(--accent-soft); }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
 }
+
+/* Phase 4 research backend controls */
+.api-json { max-height: 280px; overflow: auto; margin: 10px 0 0; padding: 12px; border: 1px solid var(--border); border-radius: 11px; background: var(--surface-2); color: var(--muted); font: 10px/1.55 ui-monospace, SFMono-Regular, Consolas, monospace; white-space: pre-wrap; overflow-wrap: anywhere; }
+input[type="checkbox"] { width: 15px; height: 15px; min-height: 0 !important; margin: 0 5px 0 0; padding: 0 !important; accent-color: var(--accent); vertical-align: -2px; }
+label { display: inline-flex; align-items: center; gap: 5px; color: var(--muted); font-size: 11px; }
+.btn:disabled { cursor: not-allowed; opacity: .48; transform: none; }

@@ -1,20 +1,43 @@
 # System Architecture
 
-## 1. Two execution paths
+## 1. Three layers and two model paths
 
-PulseLab currently contains a browser demonstration and a Python research engine. They are intentionally separate in this release.
+PulseLab contains a browser-side synthetic demonstration and a Python MIT-BIH research engine. Phase 4 adds a local FastAPI integration layer that connects the browser workspace to Python experiment orchestration and saved research outputs. It does **not** make the synthetic browser classifier share weights or feature schemas with the Python model.
 
-### Browser demonstration
+### Browser workspace
 
 ```text
 web/index.html
    ├── web/styles.css       Apple-inspired design system, responsive layout, themes
-   ├── web/app.js           Navigation, views, interactions, canvas rendering
+   ├── web/app.js           Navigation, views, interactions, API client and charts
    └── web/core.js          Synthetic ECG generator, processing, features,
                             rough-set selector, fuzzy rules, evaluation
 ```
 
-The browser application is static and client-side. It generates synthetic ECG records when the page loads and trains its demonstration models in the browser. It does not call the Python modules, load MIT-BIH records, or use Python model artifacts.
+The original ECG Analysis, Feature Extraction, Rough Set, Fuzzy and Model Evaluation screens remain a client-side synthetic demonstration. They do not call Python models or claim MIT-BIH performance. The new Research Backend screen calls the local API to display service / dataset status, start Python research jobs and inspect saved Python outputs.
+
+### Phase 4 API integration
+
+```text
+Browser /web/  ── same-origin JSON requests ──>  server.py (FastAPI)
+                                                   ├── /api/health
+                                                   ├── /api/dataset/status
+                                                   ├── dataset audit jobs
+                                                   ├── R-peak validation jobs
+                                                   ├── classifier experiment jobs
+                                                   ├── saved experiment summaries
+                                                   └── safe report downloads
+                                                               │
+                                                               ▼
+                                                       modules.pipeline
+                                                       modules.dataset_audit
+                                                       modules.validation
+                                                               │
+                                                               ▼
+                                                   experiments/ and models/
+```
+
+`server.py` serves the frontend at `/web/` and the JSON API from `/api/`. Long-running audit / validation / experiment actions use background jobs. Job state is held in process memory; completed research artifacts are persisted under `experiments/`. The API is for localhost only and intentionally has no authentication layer.
 
 ### Python research engine
 
@@ -43,7 +66,7 @@ modules.metrics + pipeline
 experiments/<run_id>/ + models/<run_id>/
 ```
 
-`train.py` is the CLI entrypoint. `app.py` is a Streamlit research console. Both call the same `modules.pipeline` implementation.
+`train.py` is the CLI entrypoint. `app.py` is an alternative Streamlit research console. `server.py` exposes the same audit, validation and `modules.pipeline` functionality to the browser. All Python execution paths reuse the canonical Python research modules.
 
 ## 2. Research engine contracts
 
@@ -71,6 +94,10 @@ The reduct is consistency-oriented, not directly optimised for predictive accura
 
 The Phase 3 default uses a strict patient-disjoint split: 22 DS1 training records and 21 DS2 test records. Record 202 is excluded because MIT-BIH records 201 and 202 are recordings from the same subject. The historical 22/22 de Chazal record-wise list remains an explicit compatibility mode and is marked as not patient-disjoint. The default experiment detects R-peaks on both train and test signals; classifier results apply to detected beats matched to reference annotations, while R-peak false positives and misses are reported separately. The dataset is downloaded locally from PhysioNet using WFDB and is not committed or bundled in this repository. See `PHASE_3_REAL_DATA_VALIDATION.md` for the exact protocol.
 
-## 6. Non-clinical status
+## 6. API security and lifecycle
+
+The integrated API is intended to bind only to `127.0.0.1`. It has no authentication, user accounts or remote-access controls. Do not expose it to an internet-facing host or shared network. Background job metadata is process-local and disappears on server restart; finished experiment, audit and validation artifacts remain on disk.
+
+## 7. Non-clinical status
 
 PulseLab is an academic research prototype. It is not a medical device, and its predictions must not be used for diagnosis, triage, treatment or clinical decisions.

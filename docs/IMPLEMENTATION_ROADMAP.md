@@ -27,18 +27,24 @@
 - Dataset audit, validation and experiment CLI entry points plus Streamlit research-console views.
 - Tests run on deterministic fixtures and feature tables; real MIT-BIH metrics require local download and execution.
 
-## Phase 4 — Unified application integration
+## Phase 4 — Unified browser and Python API integration
 
-- Keep one user-facing UI and one authoritative research engine.
-- Define API schemas for upload validation, prediction, feature inspection, model explanation, experiment listing and report export.
-- Move long-running training into an explicit experiment workflow with progress and cancellation.
-- Persist experiment metadata and model artifacts; make simulated and real-data environments visually distinct.
+**Status: Implemented for local research orchestration.**
 
-## Phase 5 — Quality and research readiness
+- Added a local FastAPI service that serves the browser workspace and exposes health / dependency / dataset status.
+- Added background jobs and progress polling for dataset audits, independent R-peak validation and MIT-BIH classifier experiments.
+- Added saved experiment discovery, model-comparison summaries and allow-listed report downloads.
+- Added the Research Backend page to the browser navigation while retaining the synthetic demonstration as a separately labelled model path.
+- Added API integration tests and localhost-only run guidance.
 
-- Full browser, API and data-pipeline integration tests.
-- Input validation, file-size limits, sampling-rate/channel handling and safe error messages.
-- Accessibility and browser compatibility checks.
-- Performance profiling and large-signal testing.
-- Repeated patient-wise splits and external validation where suitable data licences permit.
-- Research documentation, limitations, ablation studies and final packaging.
+**Explicitly deferred:** raw ECG file upload into the Python inference path, Python model-backed per-beat prediction / explanation inside the browser, user authentication, remote deployment and job cancellation. Those require a separately versioned inference contract, strict input limits and additional validation; Phase 4 does not claim they exist.
+
+## Phase 5 — Inference integration and research readiness
+
+- Define a versioned raw-signal / feature inference contract using the Python 47-feature schema and saved model artifacts.
+- Add validated CSV / WFDB upload with file-size, sampling-rate, channel and finite-value checks.
+- Show Python model-backed prediction, uncertainty and rule explanations only for compatible trained model artifacts.
+- Add end-to-end browser + API tests in a supported local browser, including download and job lifecycle flows.
+- Accessibility, browser compatibility, performance profiling and long-signal tests.
+- Repeated patient-wise splits, ablation studies and external validation where suitable datasets and licences permit.
+- Final research documentation, limitations and release packaging.
