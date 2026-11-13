@@ -345,6 +345,9 @@ def run_feature_experiment(
         "created_at_utc": datetime.now(timezone.utc).isoformat(),
         "feature_schema_version": (metadata or {}).get("feature_schema_version", FEATURE_SCHEMA_VERSION),
         "feature_columns": columns,
+        # Persist training-only medians so uploaded-signal inference applies the
+        # exact same missing-value policy without fitting on inference samples.
+        "feature_medians": {str(name): float(value) for name, value in X_train.median(axis=0).fillna(0.0).items()},
         "n_features": len(columns),
         "n_train": int(len(y_train)),
         "n_test": int(len(y_test)),

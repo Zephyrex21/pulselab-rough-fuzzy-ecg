@@ -148,3 +148,152 @@ def test_saved_experiment_summary_and_artifact_download(tmp_path, monkeypatch):
     assert summary_response.json()["model_comparison"][0]["macro_f1"] == 0.75
     assert artifact.status_code == 200
     assert "Fixture report" in artifact.text
+
+
+def test_phase5_model_catalog_endpoint(monkeypatch):
+    from modules import inference
+
+    expected = [{"model_id": "run-a::model-a", "run_id": "run-a", "model_name": "Model A"}]
+    monkeypatch.setattr(inference, "discover_saved_models", lambda *args: expected)
+    with TestClient(server.app) as client:
+        response = client.get("/api/models")
+    assert response.status_code == 200
+    assert response.json()["models"] == expected
+
+
+def test_phase5_uploaded_inference_endpoint_accepts_csv_and_returns_result(monkeypatch, tmp_path):
+    from modules import inference
+
+    monkeypatch.setattr(server, "EXPERIMENTS_DIR", tmp_path / "experiments")
+    expected = {
+        "inference_id": "inference_fixture_1234",
+        "n_predictions": 1,
+        "predictions": [{"beat_index": 0, "predicted_class": "N"}],
+    }
+    def fake_execute(**kwargs):
+        assert kwargs["content"].startswith(b"ecg\n")
+        assert kwargs["filename"] == "uploaded.csv"
+        assert kwargs["sampling_rate_hz"] == 360.0
+        return expected
+    monkeypatch.setattr(inference, "execute_inference", fake_execute)
+    with TestClient(server.app) as client:
+        response = client.post(
+            "/api/inference",
+            data={"run_id": "run-a", "model_name": "Model A", "sampling_rate_hz": "360"},
+            files={"file": ("uploaded.csv", b"ecg\n0.1\n0.2\n0.3\n", "text/csv")},
+        )
+    assert response.status_code == 201
+    assert response.json() == expected
+
+
+def test_phase5_uploaded_inference_rejects_unsupported_extension():
+    with TestClient(server.app) as client:
+        response = client.post(
+            "/api/inference",
+            data={"run_id": "run-a", "model_name": "Model A", "sampling_rate_hz": "360"},
+            files={"file": ("signal.npy", b"not a csv", "application/octet-stream")},
+        )
+    assert response.status_code == 415
+
+
+def test_phase5_inference_artifact_allowlist(tmp_path, monkeypatch):
+    inference_id = "inference_fixture_1234"
+    output = tmp_path / inference_id
+    output.mkdir()
+    (output / "beat_predictions.csv").write_text("beat_index,predicted_class\n0,N\n")
+    monkeypatch.setattr(server, "EXPERIMENTS_DIR", tmp_path)
+    with TestClient(server.app) as client:
+        okay = client.get(f"/api/inferences/{inference_id}/artifacts/beat_predictions.csv")
+        denied = client.get(f"/api/inferences/{inference_id}/artifacts/secrets.txt")
+    assert okay.status_code == 200
+    assert "predicted_class" in okay.text
+    assert denied.status_code == 404
+
+
+def test_phase5_full_multipart_inference_round_trip(tmp_path, monkeypatch):
+    import json
+    import numpy as np
+    import pandas as pd
+    from modules.feature_schema import FEATURE_SCHEMA_VERSION, feature_names
+
+    run_id = "api-inference-fixture"
+    experiments = tmp_path / "experiments"
+    run_dir = experiments / run_id
+    models_root = tmp_path / "models"
+    model_dir = models_root / run_id
+    run_dir.mkdir(parents=True)
+    model_dir.mkdir(parents=True)
+    artifact = model_dir / "fixture.joblib"
+    artifact.write_bytes(b"local test artifact")
+    columns = feature_names(1)
+    manifest = {
+        "run_id": run_id,
+        "feature_schema_version": FEATURE_SCHEMA_VERSION,
+        "feature_columns": columns,
+        "feature_medians": {name: 0.0 for name in columns},
+        "metadata": {
+            "dataset": "MIT-BIH Arrhythmia Database",
+            "peak_source": "detected",
+            "split_policy": "patient-disjoint",
+            "patient_disjoint": True,
+        },
+        "score_interpretation": {"Fixture API model": "test model scores"},
+        "metrics": {"Fixture API model": {"model_artifact": f"models/{run_id}/{artifact.name}"}},
+    }
+    (run_dir / "run_manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+    monkeypatch.setattr(server, "EXPERIMENTS_DIR", experiments)
+    monkeypatch.setattr(server.config, "ROOT", tmp_path)
+    monkeypatch.setattr(server.config, "MODELS_DIR", models_root)
+
+    class ApiFixtureModel:
+        classes_ = np.array(["N", "V"])
+        def predict(self, frame):
+            return np.array(["N"] * len(frame))
+        def scores(self, frame):
+            return np.tile(np.array([[0.75, 0.25]]), (len(frame), 1))
+        def explain(self, row):
+            return {"active_rule_count": 1, "top_two_margin": 0.5, "no_rule_fired": False, "top_rules": []}
+
+    monkeypatch.setattr(server.inference.joblib, "load", lambda _path: ApiFixtureModel())
+    def fake_process_signal(signal, fs, rpeaks=None, primary=0):
+        frame = pd.DataFrame([{name: 0.25 for name in columns} for _ in range(2)])
+        frame["r_sample"] = [360, 720]
+        return {"features": frame, "rpeaks": np.array([360, 720]), "fs": 360}
+    monkeypatch.setattr(server.inference.feature_extraction, "process_signal", fake_process_signal)
+
+    samples = np.sin(np.linspace(0, 45, 360 * 5))
+    csv_content = "\n".join(f"{value:.8f}" for value in samples).encode()
+    with TestClient(server.app) as client:
+        catalog = client.get("/api/models")
+        response = client.post(
+            "/api/inference",
+            data={"run_id": run_id, "model_name": "Fixture API model", "sampling_rate_hz": "360"},
+            files={"file": ("ecg.csv", csv_content, "text/csv")},
+        )
+        assert catalog.status_code == 200
+        assert len(catalog.json()["models"]) == 1
+        assert response.status_code == 201, response.text
+        result = response.json()
+        assert result["n_predictions"] == 2
+        assert result["predictions"][0]["predicted_class"] == "N"
+        explanation = client.get(
+            f"/api/inferences/{result['inference_id']}/beats/0/explanation"
+        )
+        predictions_artifact = client.get(
+            f"/api/inferences/{result['inference_id']}/artifacts/beat_predictions.csv"
+        )
+    assert explanation.status_code == 200
+    assert explanation.json()["explanation"]["available"] is True
+    assert predictions_artifact.status_code == 200
+    assert "predicted_class" in predictions_artifact.text
+
+
+def test_frontend_exposes_phase5_model_inference_workspace():
+    index = (server.WEB_DIR / "index.html").read_text(encoding="utf-8")
+    script = (server.WEB_DIR / "app.js").read_text(encoding="utf-8")
+    styles = (server.WEB_DIR / "styles.css").read_text(encoding="utf-8")
+    assert 'data-k="inference"' in script or "inference:{label:'Model Inference'" in script
+    assert "Run Python model inference" in script
+    assert "inferences/" in script
+    assert "inference-class-distribution" in styles
+    assert "Model Inference" in index or "PulseLab" in index

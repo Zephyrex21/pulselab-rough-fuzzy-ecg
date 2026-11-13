@@ -6,13 +6,13 @@ PulseLab is an academic research prototype for ECG signal processing, Rough Set 
 
 ## Current release
 
-**Version 0.4.0 — Phase 4: Unified Browser + Python Research API**
+**Version 0.5.0 — Phase 5: Saved-Model ECG Inference**
 
-Phase 4 adds a local FastAPI service and connects it to the Apple-inspired browser workspace. From the new **Research Backend** section, users can check dependencies, inspect MIT-BIH dataset availability, launch dataset audits, run reproducible Python experiments, monitor job progress, browse saved runs and download reports. The original browser ECG Analysis / Rough Set / Fuzzy demonstration remains explicitly synthetic; its predictions and metrics are not relabelled as MIT-BIH outputs.
+Phase 5 adds a distinct **Model Inference** workspace. It discovers saved models from MIT-BIH experiment runs, accepts bounded CSV/TXT ECG uploads, runs the same Python preprocessing / R-peak / feature pipeline used by training, returns beat-level predictions, and provides fuzzy-rule explanations for model types that support them. The original browser ECG Analysis / Rough Set / Fuzzy demonstration remains explicitly synthetic; its predictions and metrics are not relabelled as MIT-BIH outputs.
 
 ## 1. Run the integrated PulseLab application (recommended)
 
-Phase 4 serves the browser interface and Python API from the same local origin. From the repository root in Windows PowerShell:
+The integrated FastAPI service serves the browser interface and Python API from the same local origin. From the repository root in Windows PowerShell:
 
 ```powershell
 py -m venv .venv
@@ -24,7 +24,7 @@ py -m uvicorn server:app --host 127.0.0.1 --port 8000
 
 Open <http://127.0.0.1:8000/web/>. The API health check is at <http://127.0.0.1:8000/api/health> and interactive API documentation is at <http://127.0.0.1:8000/api/docs>.
 
-The new **Research Backend** navigation page checks the API and dependency status, audits local MIT-BIH files, runs independent R-peak validation, launches classifier experiments, tracks job progress, lists saved experiment runs, and downloads audit / validation / experiment artifacts.
+The **Research Backend** navigation page checks the API and dependencies, audits local MIT-BIH files, runs independent R-peak validation, launches classifier experiments, tracks job progress, lists saved experiment runs, and downloads audit / validation / experiment artifacts. The **Model Inference** page lists saved compatible MIT-BIH models and runs beat-level inference on uploaded CSV/TXT signals.
 
 The existing browser ECG Analysis, Feature Extraction, Rough Set, Fuzzy Logic and Model Evaluation pages still run the separate synthetic demonstration. Those client-side scores are never presented as MIT-BIH experiment results. The browser UI retains responsive layouts and persistent light / dark themes.
 
@@ -160,9 +160,21 @@ py -m pytest -q
 node tests/browser_core_smoke.test.js
 ```
 
-Phase 4 adds API integration tests covering health / dependency reporting, dataset status, frontend static serving, dataset-audit job handling, missing-data experiment errors and artifact path validation.
+Phase 5 adds model-catalog, multipart upload, CSV parsing, saved artifact resolution, beat-level inference, explanation and inference artifact tests, alongside the Phase 4 API integration tests.
 
 The Python tests use deterministic synthetic records / feature tables and dependency-injected detector functions for unit testing. They verify the algorithms and report generation; they do not substitute for running the full MIT-BIH dataset experiment.
+
+## 8. Run saved-model inference on an uploaded ECG (Phase 5)
+
+1. Complete a MIT-BIH experiment with **Save model artifacts** enabled in Research Backend, or run `py train.py --download` after the MIT-BIH dataset is ready.
+2. Start the integrated service with `py -m uvicorn server:app --host 127.0.0.1 --port 8000`.
+3. Open **Model Inference** in the sidebar. Refresh the model list, select a saved MIT-BIH model, upload a `.csv` or `.txt` file, and enter its sampling rate (100–2000 Hz).
+4. The upload must contain one or two numeric ECG signal columns, matching the selected model's channel count. A header is optional. Common named time/index columns are ignored; with headerless files, the first numeric columns are treated as ECG leads. Use the same lead order used during training.
+5. Review the detected beats, AAMI class outputs, model-specific scores and any available fuzzy-rule explanation. Download `beat_predictions.csv` for analysis.
+
+Upload constraints: 20 MB maximum; 3 seconds to 10 minutes; 100–2000 Hz; short internal missing-sample gaps may be interpolated. Raw uploaded samples are processed in memory and are not saved. Derived beat features, predictions and summary metadata are written to `experiments/inference_<id>/`. The upload route requires `python-multipart`, installed through `requirements.txt`.
+
+Inference is limited to saved models whose run manifest confirms the current MIT-BIH feature schema and whose `.joblib` artifact exists under `models/`. Models trained with annotation-guided peaks are flagged because inference uses automatic peak detection. Model scores are ranking/normalised outputs and are not calibrated probabilities. This is research software, not a medical device.
 
 ## Outputs
 
@@ -203,6 +215,15 @@ experiments/<run_id>/
 
 When model saving is enabled, model artifacts are stored under `models/<run_id>/`. Local datasets and generated artifacts are ignored by Git by default.
 
+Saved-model inference:
+
+```text
+experiments/inference_<id>/
+    inference_summary.json
+    beat_predictions.csv
+    beat_features.csv
+```
+
 ## Metrics and interpretation
 
 Reported classifier metrics include accuracy, balanced accuracy, macro/weighted F1, per-class precision, sensitivity/recall, specificity, confusion matrices and one-vs-rest ROC-AUC / average precision when mathematically defined. Record-cluster bootstrap intervals are reported for accuracy and fixed-five-class macro-F1 when held-out record IDs are available.
@@ -216,7 +237,7 @@ A single MIT-BIH split, even with record-cluster intervals, is not external vali
 ```text
 config.py                    Shared configuration, AAMI mapping and split protocols
 app.py                        Streamlit research console (alternative UI)
-server.py                     Phase 4 FastAPI service + static web host
+server.py                     Phase 4–5 FastAPI service + static web host
 train.py                     MIT-BIH classification CLI
 audit_dataset.py             Dataset integrity / provenance audit CLI
 validate_rpeaks.py           Standalone R-peak validation CLI
@@ -235,6 +256,7 @@ modules/
   baseline_models.py           Random Forest and RBF-SVM baselines
   metrics.py                   AAMI metrics, record-level metrics and cluster bootstrap
   pipeline.py                  Reproducible feature, model and report orchestration
+  inference.py                 Saved-model registry, ECG CSV parsing and beat inference
 web/
   index.html                   Browser application shell
   styles.css                   Phase 1 design system and responsive themes

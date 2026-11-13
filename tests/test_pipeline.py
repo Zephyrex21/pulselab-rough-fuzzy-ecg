@@ -41,6 +41,8 @@ def test_pipeline_runs_python_fuzzy_and_hybrid_models(tmp_path):
     assert (output / "a_fuzzy_all_features_rule_base.json").exists()
     assert (output / "b_rough_set_fuzzy_rule_base.json").exists()
     assert "model_reports" in manifest
+    assert set(manifest["feature_medians"]) == {"f1", "f2", "f3"}
+    assert all(np.isfinite(value) for value in manifest["feature_medians"].values())
 
 
 def test_pipeline_rejects_record_overlap(tmp_path):

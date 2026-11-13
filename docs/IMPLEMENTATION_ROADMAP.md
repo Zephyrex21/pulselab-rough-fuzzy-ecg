@@ -39,12 +39,20 @@
 
 **Explicitly deferred:** raw ECG file upload into the Python inference path, Python model-backed per-beat prediction / explanation inside the browser, user authentication, remote deployment and job cancellation. Those require a separately versioned inference contract, strict input limits and additional validation; Phase 4 does not claim they exist.
 
-## Phase 5 — Inference integration and research readiness
+## Phase 5 — Saved-model ECG inference integration
 
-- Define a versioned raw-signal / feature inference contract using the Python 47-feature schema and saved model artifacts.
-- Add validated CSV / WFDB upload with file-size, sampling-rate, channel and finite-value checks.
-- Show Python model-backed prediction, uncertainty and rule explanations only for compatible trained model artifacts.
-- Add end-to-end browser + API tests in a supported local browser, including download and job lifecycle flows.
-- Accessibility, browser compatibility, performance profiling and long-signal tests.
-- Repeated patient-wise splits, ablation studies and external validation where suitable datasets and licences permit.
-- Final research documentation, limitations and release packaging.
+**Status: Implemented and covered by automated tests; full MIT-BIH inference still requires a trained local model and the optional dataset / dependency setup.**
+
+- Added a saved-model catalog limited to compatible MIT-BIH experiment manifests and model artifacts within the project `models/` directory.
+- Persisted training-only feature medians in new experiment manifests so inference applies the training preprocessing policy without fitting on uploaded data.
+- Added validated CSV/TXT parsing with file-size, duration, sampling-rate, numeric-channel, missing-value and constant-signal checks.
+- Added Python inference using the same preprocessing, automatic R-peak detection, beat segmentation and canonical feature schema used by the research pipeline.
+- Added beat-level AAMI predictions, model-specific score summaries, per-class counts, low-score-separation review flags and downloadable CSV/JSON artifacts.
+- Added on-demand fuzzy rule / membership explanations for fuzzy-only and Rough-Set + fuzzy models; baseline models clearly report that rule explanations are unavailable.
+- Added a Model Inference page to the Apple-inspired web application while keeping the earlier synthetic demonstration separately labelled.
+- Raw uploaded ECG samples are processed in memory and are not persisted; derived features and prediction outputs are stored locally under `experiments/`.
+- Added API, parser, model-registry, saved-artifact, inference and explanation tests.
+
+**Constraints:** CSV/TXT only (no WFDB pair upload yet); one or two numeric ECG channels; 20 MB maximum; 3 seconds to 10 minutes; 100–2000 Hz. The API remains unauthenticated and must be bound to `127.0.0.1`. The inference output is not clinically validated.
+
+**Deferred beyond Phase 5:** full browser end-to-end automation in a real browser, profiling on long real MIT-BIH signals, repeated patient-wise cross-validation, ablation studies, external validation, authentication and remote deployment.

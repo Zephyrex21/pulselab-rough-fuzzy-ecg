@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.5.0 — Phase 5: Saved-Model ECG Inference
+
+- Added a trusted saved-model catalog backed by MIT-BIH experiment manifests and existing model artifacts.
+- Persisted training-only feature medians in new run manifests for reproducible inference-time feature cleaning.
+- Added validated CSV/TXT ECG upload with size, duration, sampling-rate, channel, finite-value and constant-signal checks.
+- Added Python inference using the same preprocessing, automatic R-peak detection, beat segmentation and feature extraction pipeline as training.
+- Added beat-level predictions, class score summaries, review flags, derived-feature / prediction artifacts and on-demand fuzzy rule explanations.
+- Added the Model Inference workspace to the browser application, retaining a clear boundary between synthetic demonstration results and saved Python model outputs.
+- Raw uploaded signal samples are processed in memory and not persisted; derived features and prediction artifacts are saved locally.
+- Added `python-multipart` and automated tests for CSV parsing, saved-model discovery, path safety, multipart API upload, predictions and explanations.
+- Kept the local API unauthenticated and documented that it must remain bound to loopback; no clinical or real-time diagnostic claims are made.
+
+
 
 ## 0.4.0 — Phase 4: Unified browser and Python API
 
