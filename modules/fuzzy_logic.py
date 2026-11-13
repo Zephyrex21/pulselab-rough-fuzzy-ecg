@@ -197,7 +197,7 @@ class FuzzyRuleClassifier:
 
         self.feature_names_ = list(frame.columns)
         self.classes_ = list(np.unique(labels))
-        values = frame.to_numpy(dtype=float)
+        values = frame.to_numpy(dtype=float, copy=True)
         values[~np.isfinite(values)] = np.nan
         self.medians_ = np.nanmedian(values, axis=0)
         self.medians_ = np.where(np.isfinite(self.medians_), self.medians_, 0.0)
