@@ -98,7 +98,7 @@ class FuzzyRuleClassifier:
             frame = frame.loc[:, self.feature_names_]
         elif frame.shape[1] != len(self.feature_names_):
             raise ValueError(f"Expected {len(self.feature_names_)} features, received {frame.shape[1]}")
-        values = frame.to_numpy(dtype=float)
+        values = frame.to_numpy(dtype=float, copy=True)
         values[~np.isfinite(values)] = np.nan
         values = np.where(np.isnan(values), self.medians_[None, :], values)
         return pd.DataFrame(values, columns=self.feature_names_, index=frame.index)
