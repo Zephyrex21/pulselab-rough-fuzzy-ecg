@@ -46,11 +46,32 @@ EXCLUDED_SYMBOLS = {
 }
 # Records containing paced rhythm are excluded by AAMI recommendation
 PACED_RECORDS = ["102", "104", "107", "217"]
-# Inter-patient split of de Chazal et al. (2004): DS1 = train, DS2 = test
+# Traditional de Chazal record-wise split. Records 201 and 202 belong to the
+# same subject, despite appearing on opposite sides in the commonly copied
+# 22/22 list. Keep that list for explicit compatibility experiments only.
 DS1 = ["101","106","108","109","112","114","115","116","118","119","122","124",
        "201","203","205","207","208","209","215","220","223","230"]
-DS2 = ["100","103","105","111","113","117","121","123","200","202","210","212",
-       "213","214","219","221","222","228","231","232","233","234"]
+DS2_DE_CHAZAL = ["100","103","105","111","113","117","121","123","200","202","210","212",
+                 "213","214","219","221","222","228","231","232","233","234"]
+# Strict patient-disjoint default: remove record 202 because subject 201/202
+# would otherwise be represented in both training and test sets.
+DS2 = [rid for rid in DS2_DE_CHAZAL if rid != "202"]
+SPLIT_PROTOCOLS = ("patient-disjoint", "de-chazal-record-wise")
+
+
+def patient_id_for_record(record_id: str) -> str:
+    """Return a subject-group ID; MIT-BIH records 201 and 202 share a subject."""
+    rid = str(record_id)
+    return "subject_201_202" if rid in {"201", "202"} else f"subject_{rid}"
+
+
+def get_record_split(protocol: str = "patient-disjoint") -> tuple[list[str], list[str]]:
+    """Return a documented train/test split, defaulting to strict patient isolation."""
+    if protocol == "patient-disjoint":
+        return list(DS1), list(DS2)
+    if protocol == "de-chazal-record-wise":
+        return list(DS1), list(DS2_DE_CHAZAL)
+    raise ValueError(f"Unknown split protocol {protocol!r}; choose from {SPLIT_PROTOCOLS}")
 
 # ---- model hyper-parameters ---------------------------------------------------
 ROUGH_BINS = 4                # equal-frequency discretisation bins
@@ -61,6 +82,7 @@ FUZZY_RULES_PER_CLASS = 12
 FUZZY_MAX_ANTECEDENTS = 3
 FUZZY_BEAM = 30
 FUZZY_MIN_SUPPORT = 0.03
+RPEAK_MATCH_TOLERANCE_SEC = 0.075
 MIN_TRAIN_SAMPLES_PER_CLASS = 20
 
 DISCLAIMER = ("Academic research prototype. Outputs are NOT medically validated and must NOT be used "

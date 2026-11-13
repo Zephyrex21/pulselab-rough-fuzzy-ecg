@@ -2,48 +2,43 @@
 
 ## Phase 1 — Foundation and interface system
 
-**Status: Implemented in this handoff.**
+**Status: Implemented.**
 
-- Clarify current and target architecture.
-- Add design tokens and responsive navigation shell.
-- Add persistent light/dark themes.
-- Preserve and accurately label the existing synthetic browser demonstration.
-- Document current limitations and verification.
+- PulseLab branding and Apple-inspired responsive navigation.
+- Persistent light/dark themes.
+- Design tokens, architecture notes and browser demo safeguards.
 
 ## Phase 2 — Research engine completion
 
-**Status: Implemented in this handoff.** The Python MIT-BIH engine now has its own versioned feature schema; browser/Python schema consolidation is intentionally deferred to Phase 4.
+**Status: Implemented.**
 
-- Implemented `modules/fuzzy_logic.py` with training-only membership fitting, rule induction, inference, scoring and explanations.
-- Implemented `modules/pipeline.py` to orchestrate annotated record loading, feature assembly, train-only transformations, model fitting and experiment artifacts.
-- Added class-balanced rough/fuzzy rule sampling, missing-class reporting and record / patient / subject overlap checks.
-- Added reproducibility manifests with record splits, feature-schema version, model reports, metrics and configuration snapshots.
-- Added CLI and Streamlit research-console entrypoints.
-- Added deterministic unit and pipeline tests for fuzzy rules, Rough Set primitives, metrics, signal utilities and experiment artifact generation.
+- Python fuzzy classifier, Rough Set + fuzzy hybrid, canonical 47-feature Python schema.
+- Experiment pipeline, model comparisons, metrics, model saving/loading and Streamlit console.
+- Training-only imputation / feature selection and record split checks.
 
-## Phase 3 — Real MIT-BIH experiments
+## Phase 3 — Real MIT-BIH validation and reproducible experiments
 
-- Install and pin dependencies; implement a controlled dataset download/cache flow.
-- Verify AAMI annotation mapping and record exclusions.
-- Test preprocessing and beat segmentation at dataset boundaries.
-- Resolve channel policy and align Python/browser feature schemas (including RR descriptors and wavelet basis).
-- Fit every learned transform on training records only.
-- Evaluate on the established inter-patient split and report accuracy, macro-F1, balanced accuracy, per-class precision/recall/specificity/F1, confusion matrices and timing.
-- Add confidence intervals or repeated patient-wise splits before making broad comparative claims.
+**Status: Implementation delivered; full-data execution remains a local step because MIT-BIH files are not bundled.**
 
-## Phase 4 — Application integration
+- Dataset inventory, AAMI annotation counts, class support, WFDB file checks and SHA-256 provenance.
+- Strict subject-disjoint default split; historical de Chazal record-wise compatibility retained with an explicit overlap warning for records 201/202.
+- Automatic detector-based feature extraction for training and test records.
+- Separate R-peak detection metrics, conditional matched-beat classifier metrics, per-record results and record-cluster bootstrap intervals.
+- Dataset audit, validation and experiment CLI entry points plus Streamlit research-console views.
+- Tests run on deterministic fixtures and feature tables; real MIT-BIH metrics require local download and execution.
 
-- Keep one UI and one authoritative research engine.
+## Phase 4 — Unified application integration
+
+- Keep one user-facing UI and one authoritative research engine.
 - Define API schemas for upload validation, prediction, feature inspection, model explanation, experiment listing and report export.
 - Move long-running training into an explicit experiment workflow with progress and cancellation.
-- Persist experiment metadata, model artifacts and reproducibility manifests.
-- Make synthetic and real-data environments visually distinct.
+- Persist experiment metadata and model artifacts; make simulated and real-data environments visually distinct.
 
 ## Phase 5 — Quality and research readiness
 
-- Automated Python, JavaScript and API test suites.
+- Full browser, API and data-pipeline integration tests.
 - Input validation, file-size limits, sampling-rate/channel handling and safe error messages.
 - Accessibility and browser compatibility checks.
 - Performance profiling and large-signal testing.
-- Reproducible setup, data provenance and model cards.
+- Repeated patient-wise splits and external validation where suitable data licences permit.
 - Research documentation, limitations, ablation studies and final packaging.

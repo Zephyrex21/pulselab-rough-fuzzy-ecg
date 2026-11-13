@@ -1,31 +1,30 @@
 # PulseLab — Hybrid Rough-Fuzzy ECG Research Platform
 
-PulseLab is an academic research prototype for ECG signal processing, Rough Set Theory-based feature reduction, and interpretable fuzzy-rule arrhythmia classification. The repository contains a polished browser demonstration and a separate Python research engine.
+PulseLab is an academic research prototype for ECG signal processing, Rough Set Theory-based feature reduction, and interpretable fuzzy-rule arrhythmia classification. It contains a polished synthetic browser demonstration and a separate Python research engine for MIT-BIH experiments.
 
 > **Research-use disclaimer:** PulseLab is not a medical device. Its outputs are not clinically validated and must not be used for diagnosis, treatment, triage, or clinical decision-making.
 
 ## Current release
 
-**Version 0.2.0 — Phase 2: Research Engine Completion**
+**Version 0.3.0 — Phase 3: Real MIT-BIH Validation**
 
-Phase 2 completes the Python fuzzy rule classifier and experiment pipeline, adds a canonical Python feature schema, provides a working CLI and Streamlit research console, and adds automated algorithm tests.
+Phase 3 adds dataset integrity and provenance audits, a stricter patient-disjoint default split, automatic R-peak feature extraction, separate R-peak detector validation, per-record classification results, record-cluster confidence intervals and a reproducible report. The browser workspace continues to use its own synthetic demonstration data; it is not silently connected to the Python research models.
 
 ## 1. Run the Apple-inspired browser workspace
 
-The static browser workspace needs no build tool or npm installation.
+The static browser workspace requires no npm install or build step:
 
 ```powershell
-# From the repository root on Windows
 py -m http.server 8000
 ```
 
 Open <http://localhost:8000/web/>.
 
-The browser UI includes responsive layouts and persistent light/dark appearance. Its current models are trained on synthetic ECG generated in the browser. They are demonstration models, not MIT-BIH-trained models.
+The browser workspace supports responsive layouts and persistent light/dark themes. Its models are trained on synthetic ECG generated in the browser. The page marks the environment as simulated. It is not the real MIT-BIH experiment console.
 
 ## 2. Set up the Python research engine
 
-Use Python 3.10 or newer. On Windows PowerShell, from the repository root:
+Use Python 3.10 or newer. From the repository root in Windows PowerShell:
 
 ```powershell
 py -m venv .venv
@@ -34,42 +33,91 @@ python -m pip install --upgrade pip
 pip install -r requirements.txt
 ```
 
-The Python feature extraction path requires NumPy, SciPy, pandas and PyWavelets. MIT-BIH record loading and downloading use WFDB. The dataset is not included in the ZIP.
+The Python engine uses NumPy, pandas, SciPy, scikit-learn, WFDB, PyWavelets, Streamlit, Plotly and joblib. The MIT-BIH data is not bundled with the ZIP.
 
-## 3. Run a quick engineering experiment
+## 3. Audit and download MIT-BIH records
 
-This downloads a smaller subset (8 training records and 6 testing records from the configured DS1 / DS2 lists), extracts ECG heartbeat features, and runs the model suite:
+Quick engineering audit and download (8 training + 6 testing records):
+
+```powershell
+py audit_dataset.py --download --quick
+```
+
+Full strict patient-disjoint audit and download:
+
+```powershell
+py audit_dataset.py --download
+```
+
+The audit checks `.hea`, `.dat` and `.atr` file presence, readable signal metadata, sampling frequency, channel count, record duration, annotation coverage, AAMI class support, train/test patient separation and SHA-256 file hashes. It writes JSON and CSV reports under `experiments/`.
+
+### Why the default split has 21 test records
+
+The historical de Chazal list contains 22 DS1 training and 22 DS2 testing records, but records **201 and 202 are from the same subject**. PulseLab's default strict patient-disjoint split removes record 202 from test, giving 22 training and 21 testing records. The original 22/22 list is retained only as an explicit compatibility mode:
+
+```powershell
+py audit_dataset.py --download --split-protocol de-chazal-record-wise
+```
+
+This compatibility mode is not strictly patient-disjoint and the audit / experiment manifest mark it accordingly.
+
+## 4. Validate R-peak detection separately
+
+Quick test-record detector validation:
+
+```powershell
+py validate_rpeaks.py --download --quick
+```
+
+Full strict test split:
+
+```powershell
+py validate_rpeaks.py --download
+```
+
+The detector is compared with AAMI-mappable reference beat annotations using one-to-one matching (default tolerance: 75 ms). It reports TP, FP, FN, sensitivity, PPV, F1 and matched-beat timing error. These are R-peak detection metrics, not arrhythmia classification metrics.
+
+## 5. Run the MIT-BIH classifier experiment
+
+Quick automatic-detection engineering run:
 
 ```powershell
 py train.py --download --quick
 ```
 
-The quick subset is intended to verify installation and execution. It is not the full research evaluation and may not contain examples from every AAMI class.
-
-## 4. Run the complete configured DS1 / DS2 experiment
+Complete strict patient-disjoint experiment:
 
 ```powershell
 py train.py --download
 ```
 
-The experiment compares:
+By default, automatic R-peaks are detected on both training and test records. Supervised classifier features are retained only for detected beats matched one-to-one to reference annotations. The resulting classification metrics are conditional on matched detected beats; detector false positives and missed reference beats are reported separately in the same run.
 
-| Model | Description |
-|---|---|
-| A | Fuzzy classifier using all extracted features |
-| B | Rough Set feature reduct followed by fuzzy classification |
-| C1 | Random Forest baseline |
-| C2 | RBF-SVM baseline |
+For a controlled annotation-guided classifier benchmark (not an automatic end-to-end estimate):
 
-To skip conventional baselines:
+```powershell
+py train.py --peak-source annotations
+```
+
+For historical 22/22 record-wise comparability only:
+
+```powershell
+py train.py --split-protocol de-chazal-record-wise
+```
+
+To skip Random Forest and SVM:
 
 ```powershell
 py train.py --no-baselines
 ```
 
-To download records separately, run `py train.py --download --quick` or `py train.py --download` once; subsequent runs use locally available records.
+To save metrics without serializing trained models:
 
-## 5. Open the Python research console
+```powershell
+py train.py --no-save-models
+```
+
+## 6. Open the Python research console
 
 After dependencies are installed:
 
@@ -77,20 +125,46 @@ After dependencies are installed:
 streamlit run app.py
 ```
 
-The console shows dataset availability, downloads the records needed for the chosen split, launches an experiment, and displays the saved model comparison and run metadata.
+The console contains tabs for:
 
-## 6. Run automated tests
+- Overview and evaluation safeguards
+- Dataset quality audit and class counts
+- Independent R-peak detector validation
+- AAMI beat-classification experiment
+- Saved result comparison and per-record metrics
+
+The static browser application remains separately available at `http://localhost:8000/web/`.
+
+## 7. Run automated tests
 
 ```powershell
 py -m pytest -q
 node tests/browser_core_smoke.test.js
 ```
 
-The Python tests use deterministic synthetic feature tables to exercise the fuzzy classifier, Rough Set selector, metrics and experiment artifact writer. They do not replace evaluation on the MIT-BIH test records.
+The Python tests use deterministic synthetic records / feature tables and dependency-injected detector functions for unit testing. They verify the algorithms and report generation; they do not substitute for running the full MIT-BIH dataset experiment.
 
 ## Outputs
 
-Each run writes a timestamped folder under `experiments/`:
+Dataset audit:
+
+```text
+experiments/dataset_audit_<timestamp>/
+    dataset_audit.json
+    record_inventory.csv
+    class_distribution.csv
+    file_sha256_manifest.csv
+```
+
+R-peak validation:
+
+```text
+experiments/rpeak_validation_<timestamp>/
+    rpeak_validation.json
+    rpeak_metrics_per_record.csv
+```
+
+Classification experiment:
 
 ```text
 experiments/<run_id>/
@@ -98,47 +172,61 @@ experiments/<run_id>/
     metrics.json
     model_comparison.csv
     per_class_metrics.csv
+    per_record_model_metrics.csv
+    test_predictions.csv
+    rpeak_detection_metrics.json
+    rpeak_detection_per_record.csv
     *_confusion_matrix.csv
+    *_rule_base.json
+    research_report.md
 ```
 
-When model saving is enabled, model artifacts are written to `models/<run_id>/`. These local datasets and generated artifacts are ignored by Git by default.
+When model saving is enabled, model artifacts are stored under `models/<run_id>/`. Local datasets and generated artifacts are ignored by Git by default.
 
-Reported metrics include accuracy, balanced accuracy, macro/weighted F1, per-class precision, sensitivity/recall, specificity and (when mathematically defined) one-vs-rest ROC-AUC and average precision. Fuzzy and SVM scores are not presented as calibrated probabilities.
+## Metrics and interpretation
+
+Reported classifier metrics include accuracy, balanced accuracy, macro/weighted F1, per-class precision, sensitivity/recall, specificity, confusion matrices and one-vs-rest ROC-AUC / average precision when mathematically defined. Record-cluster bootstrap intervals are reported for accuracy and fixed-five-class macro-F1 when held-out record IDs are available.
+
+Fuzzy scores and SVM ranking scores are not calibrated clinical probabilities. In automatic-detection mode, classifier metrics describe only matched detected beats. Consider those alongside the separate detector sensitivity / PPV / F1 and the number of unmatched detections / reference beats.
+
+A single MIT-BIH split, even with record-cluster intervals, is not external validation or clinical validation. The current implementation is offline / retrospective: zero-phase filtering, record-level amplitude normalisation and the next-RR feature use future or whole-record context. It is not a validated streaming or real-time system.
 
 ## Repository map
 
 ```text
-config.py                    Shared experiment configuration and AAMI mapping
-app.py                       Streamlit research console
-train.py                     CLI for MIT-BIH experiments
+config.py                    Shared configuration, AAMI mapping and split protocols
+app.py                       Phase 3 Streamlit research console
+train.py                     MIT-BIH classification CLI
+audit_dataset.py             Dataset integrity / provenance audit CLI
+validate_rpeaks.py           Standalone R-peak validation CLI
 modules/
   data_loader.py              WFDB record loading and AAMI labels
-  preprocessing.py            Baseline removal, filtering, normalisation
-  rpeak_detection.py          R-peak detection, refinement and matching
+  dataset_audit.py            File integrity, class support, checksums and split audit
+  preprocessing.py            Baseline removal, filtering, normalisation and resampling
+  rpeak_detection.py          R-peak detection, refinement and one-to-one matching
+  validation.py               Independent detector validation and aggregate metrics
   segmentation.py             Beat-window extraction
   feature_schema.py            Canonical ordered Python feature schema
-  feature_extraction.py        RR, morphology, statistical, spectral, wavelet features
+  feature_extraction.py        RR, morphology, statistical, spectral and wavelet features
   rough_set.py                 Discretisation, dependency, approximations and QuickReduct
-  fuzzy_logic.py               Fuzzy membership functions, rules and explanations
+  fuzzy_logic.py               Fuzzy membership functions, rules, inference and explanations
   hybrid_model.py              Fuzzy-only and Rough-Set + fuzzy model wrappers
   baseline_models.py           Random Forest and RBF-SVM baselines
-  metrics.py                   Fixed-order AAMI evaluation helpers
-  pipeline.py                  Reproducible experiment orchestration and artifacts
+  metrics.py                   AAMI metrics, record-level metrics and cluster bootstrap
+  pipeline.py                  Reproducible feature, model and report orchestration
 web/
   index.html                   Browser application shell
   styles.css                   Phase 1 design system and responsive themes
   app.js                       Browser views and interactions
   core.js                      Synthetic-data browser demonstration algorithms
-tests/                         Python and JavaScript automated tests
-docs/                          Architecture, methodology and phase notes
+tests/                         Python and JavaScript tests
+docs/                          Architecture, methodology, design and phase notes
 ```
 
-## Research boundaries and interpretation
+## Dataset citation
 
-- The browser and Python feature pipelines are separate implementations. The browser currently uses a 25-feature synthetic schema; the Python MIT-BIH pipeline uses a 47-feature two-channel schema. They must not be treated as equivalent.
-- The real-data Python pipeline must be run locally with downloaded MIT-BIH records. This repository does not bundle ECG data or model weights.
-- All learned transformations are fitted on training data. The default DS1 / DS2 experiment uses disjoint record lists to reduce patient leakage.
-- Quick-run metrics are engineering checks. Research conclusions should be based on the complete record-wise experiment and ideally additional independent splits.
-- A single dataset split does not provide confidence intervals or clinical validation.
+Moody, G. B., & Mark, R. G. (2005). *MIT-BIH Arrhythmia Database* (version 1.0.0). PhysioNet. https://doi.org/10.13026/C2F305
 
-See `docs/PHASE_2_RESEARCH_ENGINE.md`, `docs/ARCHITECTURE.md` and `docs/METHODOLOGY.md` for implementation details.
+Moody, G. B., & Mark, R. G. (2001). The impact of the MIT-BIH Arrhythmia Database. *IEEE Engineering in Medicine and Biology Magazine*, 20(3), 45–50.
+
+See `docs/PHASE_3_REAL_DATA_VALIDATION.md`, `docs/PHASE_2_RESEARCH_ENGINE.md`, `docs/ARCHITECTURE.md` and `docs/METHODOLOGY.md` for further details.

@@ -11,6 +11,7 @@ try:
 except ImportError:  # dependency checked at wavelet-feature execution time
     pywt = None
 from scipy import stats
+import config
 from config import FS, get_logger
 from modules.feature_schema import RR_FEATURES, CHANNEL_FEATURES as CH_FEATURES, feature_names, feature_domain
 from modules import preprocessing as pp, rpeak_detection as rd, segmentation as sg
@@ -133,30 +134,113 @@ def process_signal(signal: np.ndarray, fs: float, rpeaks: np.ndarray | None = No
             "n_channels": sig.shape[1], "signal": sig}
 
 
-def build_record_features(record, primary: int = 0, max_channels: int = 2) -> pd.DataFrame:
-    """Features for an MIT-BIH record using its annotated beat locations (both channels)."""
+def build_record_features(
+    record,
+    primary: int = 0,
+    max_channels: int = 2,
+    peak_source: str = "annotations",
+    detection_tolerance_sec: float = config.RPEAK_MATCH_TOLERANCE_SEC,
+) -> pd.DataFrame:
+    """Build labelled beat features from a WFDB record.
+
+    ``peak_source="annotations"`` is an annotation-guided classification
+    benchmark: reference beat locations are refined on the ECG before feature
+    extraction. ``peak_source="detected"`` runs the automatic detector and
+    retains only one-to-one matched detections for conditional beat
+    classification. False positives and missed reference beats remain in the
+    attached ``frame.attrs['detection_metrics']`` and must be reported beside
+    (not hidden inside) the conditional classifier metrics.
+    """
+    from modules.rpeak_detection import match_detections
+
+    if peak_source not in {"annotations", "detected"}:
+        raise ValueError("peak_source must be 'annotations' or 'detected'")
+    if detection_tolerance_sec < 0:
+        raise ValueError("detection_tolerance_sec must be non-negative")
+
     sig = record.signal[:, :max_channels]
-    out = process_signal(sig, record.fs, rpeaks=record.ann_samples, primary=primary)
-    f = out["features"].copy()
-    # map every refined R peak back to the nearest annotation (labels)
-    ann, cls, sym = record.ann_samples, record.ann_classes, record.ann_symbols
+    ann = np.asarray(record.ann_samples, dtype=int)
+    cls = np.asarray(record.ann_classes)
+    sym = np.asarray(record.ann_symbols)
     if len(ann) == 0:
         raise ValueError(f"Record {record.record_id} contains no AAMI-mappable beat annotations")
-    ann_ds = np.round(ann * FS / record.fs).astype(int) if record.fs != FS else np.asarray(ann, dtype=int)
-    beat_samples = f["r_sample"].to_numpy(dtype=int)
-    # Assign each refined beat to its nearest reference annotation without assuming >= 2 annotations.
-    if len(ann_ds) == 1:
-        pick = np.zeros(len(beat_samples), dtype=int)
+    ann_ds = np.round(ann * FS / record.fs).astype(int) if record.fs != FS else ann.copy()
+
+    if peak_source == "annotations":
+        out = process_signal(sig, record.fs, rpeaks=ann, primary=primary)
     else:
-        order = np.searchsorted(ann_ds, beat_samples)
-        right_idx = np.clip(order, 0, len(ann_ds) - 1)
-        left_idx = np.clip(order - 1, 0, len(ann_ds) - 1)
-        left_dist = np.abs(beat_samples - ann_ds[left_idx])
-        right_dist = np.abs(ann_ds[right_idx] - beat_samples)
-        pick = np.where(left_dist <= right_dist, left_idx, right_idx)
-    ok = np.abs(ann_ds[pick] - beat_samples) <= int(0.1 * FS)
-    f = f.loc[ok].reset_index(drop=True)
-    pick = pick[ok]
-    f.insert(0, "record", record.record_id)
-    f["label"], f["symbol"] = cls[pick], sym[pick]
+        out = process_signal(sig, record.fs, rpeaks=None, primary=primary)
+
+    f = out["features"].copy()
+    beat_samples = f["r_sample"].to_numpy(dtype=int)
+    diagnostics = None
+
+    if peak_source == "detected":
+        detected = np.asarray(out["rpeaks"], dtype=int)
+        matched = match_detections(detected, ann_ds, FS, tol=detection_tolerance_sec)
+        # Each detected event and each reference beat occurs in at most one pair.
+        ref_to_index = {int(sample): idx for idx, sample in enumerate(ann_ds)}
+        detected_to_reference = {
+            int(det_sample): int(ref_sample)
+            for ref_sample, det_sample in matched["matched_pairs"]
+        }
+        index_by_detected = {
+            det_sample: ref_to_index[ref_sample]
+            for det_sample, ref_sample in detected_to_reference.items()
+            if ref_sample in ref_to_index
+        }
+        keep = np.array([int(sample) in index_by_detected for sample in beat_samples], dtype=bool)
+        f = f.loc[keep].reset_index(drop=True)
+        matched_detected = beat_samples[keep]
+        picks = np.asarray([index_by_detected[int(sample)] for sample in matched_detected], dtype=int)
+        reference_samples = ann_ds[picks]
+        f["reference_sample"] = reference_samples
+        f["detection_error_ms"] = (matched_detected - reference_samples) * (1000.0 / FS)
+        all_pair_errors_ms = np.asarray(
+            [(det_sample - ref_sample) * 1000.0 / FS for ref_sample, det_sample in matched["matched_pairs"]],
+            dtype=float,
+        )
+        diagnostics = {
+            "record": str(record.record_id),
+            "patient_id": config.patient_id_for_record(str(record.record_id)),
+            "peak_source": "detected",
+            "n_reference": int(len(ann_ds)),
+            "n_detected": int(len(detected)),
+            "n_matched": int(matched["tp"]),
+            "n_classifiable_matched": int(len(f)),
+            "matched_windows_excluded_at_record_edges": int(matched["tp"] - len(f)),
+            "tp": int(matched["tp"]),
+            "fp": int(matched["fp"]),
+            "fn": int(matched["fn"]),
+            "sensitivity": float(matched["sensitivity"]),
+            "ppv": float(matched["ppv"]),
+            "f1": float(2 * matched["sensitivity"] * matched["ppv"] / max(matched["sensitivity"] + matched["ppv"], 1e-12)),
+            "mean_signed_error_ms": float(all_pair_errors_ms.mean()) if len(all_pair_errors_ms) else None,
+            "mean_absolute_error_ms": float(np.abs(all_pair_errors_ms).mean()) if len(all_pair_errors_ms) else None,
+        }
+    else:
+        # Annotation-guided extraction refines each labelled event locally.
+        if len(ann_ds) == 1:
+            picks = np.zeros(len(beat_samples), dtype=int)
+        else:
+            order = np.searchsorted(ann_ds, beat_samples)
+            right_idx = np.clip(order, 0, len(ann_ds) - 1)
+            left_idx = np.clip(order - 1, 0, len(ann_ds) - 1)
+            left_dist = np.abs(beat_samples - ann_ds[left_idx])
+            right_dist = np.abs(ann_ds[right_idx] - beat_samples)
+            picks = np.where(left_dist <= right_dist, left_idx, right_idx)
+        ok = np.abs(ann_ds[picks] - beat_samples) <= int(0.1 * FS)
+        f = f.loc[ok].reset_index(drop=True)
+        picks = picks[ok]
+        f["reference_sample"] = ann_ds[picks]
+        f["detection_error_ms"] = (f["r_sample"].to_numpy(dtype=int) - ann_ds[picks]) * (1000.0 / FS)
+
+    f.insert(0, "record", str(record.record_id))
+    f["patient_id"] = config.patient_id_for_record(str(record.record_id))
+    f["label"] = cls[picks]
+    f["symbol"] = sym[picks]
+    f["peak_source"] = peak_source
+    f.attrs["peak_source"] = peak_source
+    if diagnostics is not None:
+        f.attrs["detection_metrics"] = diagnostics
     return f

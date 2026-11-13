@@ -69,7 +69,7 @@ The reduct is consistency-oriented, not directly optimised for predictive accura
 
 ## 5. Data and split policy
 
-The default evaluation uses the configured inter-patient DS1 / DS2 record lists. All beats from a record belong to exactly one side of the split. The dataset is downloaded locally from PhysioNet using WFDB and is not committed or bundled in this repository.
+The Phase 3 default uses a strict patient-disjoint split: 22 DS1 training records and 21 DS2 test records. Record 202 is excluded because MIT-BIH records 201 and 202 are recordings from the same subject. The historical 22/22 de Chazal record-wise list remains an explicit compatibility mode and is marked as not patient-disjoint. The default experiment detects R-peaks on both train and test signals; classifier results apply to detected beats matched to reference annotations, while R-peak false positives and misses are reported separately. The dataset is downloaded locally from PhysioNet using WFDB and is not committed or bundled in this repository. See `PHASE_3_REAL_DATA_VALIDATION.md` for the exact protocol.
 
 ## 6. Non-clinical status
 

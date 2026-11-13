@@ -17,7 +17,11 @@ def main() -> int:
         description="Train and evaluate PulseLab's rough-fuzzy and baseline models on MIT-BIH records."
     )
     parser.add_argument("--download", action="store_true", help="download the selected MIT-BIH records from PhysioNet")
-    parser.add_argument("--quick", action="store_true", help="use the first 8 DS1 and 6 DS2 records for a smaller engineering run")
+    parser.add_argument("--quick", action="store_true", help="use the first 8 training and 6 testing records for a smaller engineering run")
+    parser.add_argument("--split-protocol", choices=config.SPLIT_PROTOCOLS, default="patient-disjoint",
+                        help="strict patient isolation by default; de-chazal-record-wise is for historical reproduction")
+    parser.add_argument("--peak-source", choices=["detected", "annotations"], default="detected",
+                        help="detected is the automatic workflow; annotations is an annotation-guided benchmark")
     parser.add_argument("--no-baselines", action="store_true", help="skip Random Forest and RBF-SVM models")
     parser.add_argument("--no-save-models", action="store_true", help="save metrics only; do not serialize model artifacts")
     parser.add_argument("--data-dir", type=Path, default=config.DATA_DIR, help="directory containing WFDB .hea/.dat/.atr records")
@@ -25,12 +29,14 @@ def main() -> int:
     parser.add_argument("--run-name", default=None, help="optional unique experiment directory name")
     args = parser.parse_args()
 
-    train_ids = config.DS1[:8] if args.quick else list(config.DS1)
-    test_ids = config.DS2[:6] if args.quick else list(config.DS2)
+    split_train, split_test = config.get_record_split(args.split_protocol)
+    train_ids = split_train[:8] if args.quick else list(split_train)
+    test_ids = split_test[:6] if args.quick else list(split_test)
     requested = train_ids + test_ids
 
     if args.download:
         print(f"Downloading {len(requested)} MIT-BIH records into {args.data_dir} ...")
+        print(f"Split protocol: {args.split_protocol}; peak source: {args.peak_source}")
         try:
             data_loader.download_records(requested, data_dir=args.data_dir, progress=_progress)
         except ImportError as exc:
@@ -57,6 +63,9 @@ def main() -> int:
             include_baselines=not args.no_baselines,
             save_models=not args.no_save_models,
             run_name=args.run_name,
+            peak_source=args.peak_source,
+            split_protocol=args.split_protocol,
+            allow_patient_overlap=(args.split_protocol == "de-chazal-record-wise"),
         )
     except Exception as exc:
         print(f"Experiment failed: {type(exc).__name__}: {exc}")
@@ -66,6 +75,11 @@ def main() -> int:
     print("Artifacts:", output)
     print("Metrics:", output / "metrics.json")
     print("Comparison:", output / "model_comparison.csv")
+    print("Per-record metrics:", output / "per_record_model_metrics.csv")
+    detection_report = output / "rpeak_detection_metrics.json"
+    if detection_report.exists():
+        print("R-peak metrics:", detection_report)
+    print("Research report:", output / "research_report.md")
     return 0
 
 

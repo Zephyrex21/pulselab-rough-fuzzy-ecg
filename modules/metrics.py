@@ -6,7 +6,6 @@ import pandas as pd
 from sklearn.metrics import (
     accuracy_score,
     average_precision_score,
-    balanced_accuracy_score,
     confusion_matrix,
     f1_score,
     precision_score,
@@ -66,7 +65,7 @@ def evaluate_predictions(y_true, y_pred, scores=None, class_order=None) -> dict:
 
     metrics = {
         "accuracy": float(accuracy_score(truth, pred)),
-        "balanced_accuracy": float(balanced_accuracy_score(truth, pred)),
+        "balanced_accuracy": float(np.mean(recall[ [labels.index(label) for label in observed_labels] ])) if observed_labels else 0.0,
         "macro_precision": float(precision_score(truth, pred, labels=observed_labels, average="macro", zero_division=0)),
         "macro_recall": float(recall_score(truth, pred, labels=observed_labels, average="macro", zero_division=0)),
         "macro_f1": float(f1_score(truth, pred, labels=observed_labels, average="macro", zero_division=0)),
@@ -108,3 +107,89 @@ def evaluate_predictions(y_true, y_pred, scores=None, class_order=None) -> dict:
 
 def per_class_frame(model_name: str, metrics: dict) -> pd.DataFrame:
     return pd.DataFrame([{"model": model_name, **row} for row in metrics["per_class"]])
+
+
+def record_cluster_bootstrap(
+    y_true,
+    y_pred,
+    record_ids,
+    *,
+    n_bootstrap: int = 500,
+    seed: int = config.SEED,
+    class_order=None,
+) -> dict:
+    """Cluster bootstrap confidence intervals by held-out record, not by beat.
+
+    Sampling individual beats as if they were independent can produce
+    unrealistically narrow intervals because beats from one recording are
+    correlated. This resamples complete record clusters and aggregates their
+    fixed-order confusion matrices. It is an uncertainty summary, not clinical
+    validation and not a substitute for external datasets.
+    """
+    labels = list(class_order or config.CLASSES)
+    truth, pred, groups = np.asarray(y_true), np.asarray(y_pred), np.asarray(record_ids).astype(str)
+    if truth.ndim != 1 or pred.ndim != 1 or groups.ndim != 1 or not (len(truth) == len(pred) == len(groups)):
+        raise ValueError("y_true, y_pred and record_ids must be aligned one-dimensional arrays")
+    if len(truth) == 0:
+        raise ValueError("Cannot bootstrap an empty test set")
+    if n_bootstrap < 1:
+        raise ValueError("n_bootstrap must be at least 1")
+    unique_groups = np.unique(groups)
+    if len(unique_groups) < 2:
+        return {
+            "method": "record-cluster percentile bootstrap",
+            "n_records": int(len(unique_groups)), "n_bootstrap": int(n_bootstrap),
+            "status": "not_estimated", "reason": "At least two held-out records are required.",
+        }
+    matrices = []
+    for group in unique_groups:
+        mask = groups == group
+        matrices.append(confusion_matrix(truth[mask], pred[mask], labels=labels))
+    matrices = np.asarray(matrices, dtype=np.int64)
+    rng = np.random.default_rng(seed)
+    acc_values, f1_values = [], []
+    n_clusters = len(unique_groups)
+    for _ in range(int(n_bootstrap)):
+        sampled = rng.integers(0, n_clusters, size=n_clusters)
+        cm = matrices[sampled].sum(axis=0)
+        total = int(cm.sum())
+        accuracy = float(np.trace(cm) / total) if total else 0.0
+        tp = np.diag(cm).astype(float)
+        fp = cm.sum(axis=0) - tp
+        fn = cm.sum(axis=1) - tp
+        denom = 2 * tp + fp + fn
+        class_f1 = np.divide(2 * tp, denom, out=np.zeros_like(tp), where=denom > 0)
+        acc_values.append(accuracy)
+        f1_values.append(float(np.mean(class_f1)))
+    return {
+        "method": "record-cluster percentile bootstrap",
+        "n_records": int(n_clusters), "n_bootstrap": int(n_bootstrap),
+        "status": "estimated",
+        "accuracy_95ci": [float(np.percentile(acc_values, 2.5)), float(np.percentile(acc_values, 97.5))],
+        "macro_f1_all_aami_95ci": [float(np.percentile(f1_values, 2.5)), float(np.percentile(f1_values, 97.5))],
+        "seed": int(seed),
+        "resampling_unit": "held-out record / subject cluster",
+    }
+
+
+def per_record_metrics_frame(model_name: str, y_true, y_pred, record_ids) -> pd.DataFrame:
+    """Summarise classification results separately for every held-out record."""
+    truth, pred, groups = np.asarray(y_true), np.asarray(y_pred), np.asarray(record_ids).astype(str)
+    if not (len(truth) == len(pred) == len(groups)):
+        raise ValueError("y_true, y_pred and record_ids must have equal lengths")
+    rows = []
+    for record in sorted(np.unique(groups), key=lambda value: (not value.isdigit(), int(value) if value.isdigit() else value)):
+        mask = groups == record
+        result = evaluate_predictions(truth[mask], pred[mask], class_order=config.CLASSES)
+        rows.append({
+            "model": model_name,
+            "record": record,
+            "patient_id": config.patient_id_for_record(record),
+            "n_beats": int(mask.sum()),
+            "accuracy": result["accuracy"],
+            "balanced_accuracy": result["balanced_accuracy"],
+            "macro_f1_observed_classes": result["macro_f1"],
+            "macro_f1_all_aami": result["macro_f1_all_aami"],
+            "classes_present": "".join(result["macro_classes_evaluated"]),
+        })
+    return pd.DataFrame(rows)

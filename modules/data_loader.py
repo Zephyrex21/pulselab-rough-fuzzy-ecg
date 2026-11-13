@@ -27,7 +27,7 @@ class Record:
 
 
 def all_record_ids() -> list:
-    return sorted(set(config.DS1 + config.DS2 + config.PACED_RECORDS), key=int)
+    return sorted(set(config.DS1 + config.DS2_DE_CHAZAL + config.PACED_RECORDS), key=int)
 
 
 def _record_files_complete(record_id: str, data_dir: Path) -> bool:

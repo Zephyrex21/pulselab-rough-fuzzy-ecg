@@ -1,5 +1,7 @@
 # Phase 2 — Research Engine Completion
 
+> Historical phase note: the current cumulative project is PulseLab 0.3.0. Phase 3 changes the default to automatic detector-based feature extraction and a stricter patient-disjoint split. For current usage and evaluation semantics, follow `PHASE_3_REAL_DATA_VALIDATION.md` and the repository README.
+
 **Release:** PulseLab 0.2.0  
 **Scope:** Complete the missing Python fuzzy classifier and experiment pipeline, make the CLI and Streamlit research console usable, and add deterministic automated tests.
 

@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.3.0 — Phase 3: Real MIT-BIH Validation
+
+- Added dataset integrity and provenance auditing for WFDB files, annotation counts, AAMI class support and SHA-256 checksums.
+- Corrected the default evaluation protocol to strict patient-disjoint mode by excluding record 202 from test because records 201 and 202 come from the same subject.
+- Retained the classic de Chazal 22/22 record-wise list as an explicit compatibility option and marked its subject overlap in reports.
+- Added patient identifiers to extracted feature rows and enforced patient-level split checks before training.
+- Changed the default experiment feature extraction to automatic R-peak detections; classifier scores are reported conditionally on one-to-one matched detected beats.
+- Added independent one-to-one R-peak validation with TP, FP, FN, sensitivity, PPV, F1 and timing error.
+- Added per-record classifier metrics, held-out predictions and record-cluster bootstrap confidence intervals.
+- Added a human-readable Markdown experiment report and reproducibility artifacts.
+- Reworked the Streamlit research console into dataset QA, detector validation, classification and results tabs.
+- Added dataset-audit and R-peak-validation command-line tools.
+- Added dependency-injected full-record pipeline tests and detected-peak-to-reference label matching tests.
+- Documented that current feature extraction is offline / retrospective because it uses zero-phase filters, record-level amplitude scaling and next-RR context.
+- Added tests for strict split logic, same-subject overlap, detection matching, record-level metrics and report generation.
+
 ## 0.2.0 — Phase 2: Research Engine Completion
 
 - Added the Python fuzzy rule classifier with quantile memberships, beam-searched antecedents, coverage-based rule selection and sample-level explanations.
