@@ -26,3 +26,20 @@ def test_macro_f1_uses_test_present_classes_and_also_reports_all_aami_classes():
     assert result["macro_f1"] == 1.0
     assert result["macro_f1_all_aami"] == 0.6
     assert result["macro_classes_evaluated"] == ["N", "S", "V"]
+
+
+def test_patient_cluster_bootstrap_and_per_patient_summary_use_patient_units():
+    from modules.metrics import patient_cluster_bootstrap, per_patient_metrics_frame
+
+    truth = np.array(["N", "N", "V", "V", "S", "S"])
+    pred = np.array(["N", "V", "V", "V", "S", "N"])
+    patients = np.array(["p1", "p1", "p2", "p2", "p3", "p3"])
+    records = np.array(["100", "100", "101", "101", "102", "102"])
+    result = patient_cluster_bootstrap(truth, pred, patients, n_bootstrap=25, seed=3)
+    assert result["status"] == "estimated"
+    assert result["n_patients"] == 3
+    assert result["resampling_unit"] == "held-out patient"
+    frame = per_patient_metrics_frame("fixture", truth, pred, patients, records)
+    assert frame["patient_id"].tolist() == ["p1", "p2", "p3"]
+    assert frame["records"].tolist() == ["100", "101", "102"]
+    assert frame["n_beats"].tolist() == [2, 2, 2]

@@ -50,6 +50,7 @@ def _make_saved_run(tmp_path: Path):
         "feature_schema_version": FEATURE_SCHEMA_VERSION,
         "feature_columns": columns,
         "feature_medians": {name: 0.0 for name in columns},
+        "feature_reference": {name: {"q01": -100.0, "q05": -50.0, "median": 0.0, "q95": 50.0, "q99": 100.0} for name in columns},
         "models": ["Fixture model"],
         "metadata": {
             "dataset": "MIT-BIH Arrhythmia Database",
@@ -58,7 +59,10 @@ def _make_saved_run(tmp_path: Path):
             "patient_disjoint": True,
         },
         "score_interpretation": {"Fixture model": "fixture ranking scores"},
-        "metrics": {"Fixture model": {"model_artifact": f"models/{run_id}/{artifact.name}"}},
+        "metrics": {"Fixture model": {
+            "model_artifact": f"models/{run_id}/{artifact.name}",
+            "score_calibration": {"status": "fitted", "temperature": 0.5},
+        }},
     }
     (run_dir / "run_manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
     return experiments, project, models, run_id, columns
@@ -100,6 +104,8 @@ def test_discover_saved_models_lists_only_compatible_existing_artifacts(tmp_path
     assert found[0]["model_name"] == "Fixture model"
     assert found[0]["n_channels"] == 1
     assert found[0]["n_features"] == len(columns)
+    assert found[0]["score_temperature"] == pytest.approx(0.5)
+    assert found[0]["calibration_status"] == "fitted"
 
 
 def test_execute_inference_persists_beat_results_without_raw_signal(tmp_path, monkeypatch):
@@ -111,7 +117,12 @@ def test_execute_inference_persists_beat_results_without_raw_signal(tmp_path, mo
         assert fs == 360
         frame = pd.DataFrame([{name: float(i + 1) for name in columns} for i in range(2)])
         frame["r_sample"] = [360, 720]
-        return {"features": frame, "rpeaks": np.array([360, 720, 1080]), "fs": 360}
+        beat_samples = np.linspace(-0.2, 1.0, 234, dtype=float)
+        waveforms = np.vstack([beat_samples, beat_samples[::-1]])
+        return {
+            "features": frame, "rpeaks": np.array([360, 720, 1080]), "fs": 360,
+            "beats": [waveforms], "valid": np.array([True, True, False]),
+        }
 
     monkeypatch.setattr(inference.feature_extraction, "process_signal", fake_process_signal)
     samples = np.sin(np.linspace(0, 50, 360 * 5))
@@ -129,11 +140,26 @@ def test_execute_inference_persists_beat_results_without_raw_signal(tmp_path, mo
     assert result["n_predictions"] == 2
     assert [row["predicted_class"] for row in result["predictions"]] == ["N", "V"]
     assert result["predictions"][1]["time_seconds"] == pytest.approx(2.0)
+    assert result["predictions"][0]["normalised_score_entropy"] is not None
+    assert result["predictions"][0]["n_features_outside_training_range"] == 0
+    assert result["model"]["calibration_status"] == "fitted"
+    assert result["feature_drift"]["high_drift_flag"] is False
+    assert result["waveform_preview_available"] is True
+    waveform = inference.get_inference_waveform(result["inference_id"], 0, experiments)
+    assert waveform["available"] is True
+    assert waveform["r_peak_sample_in_window"] == 90
+    assert len(waveform["samples"]) == 234
+    assert waveform["samples"][0] == pytest.approx(-0.2)
     out = experiments / result["inference_id"]
     assert (out / "beat_predictions.csv").is_file()
     assert (out / "beat_features.csv").is_file()
     assert (out / "inference_summary.json").is_file()
+    assert (out / "feature_drift_per_beat.csv").is_file()
+    assert (out / "feature_drift_by_feature.csv").is_file()
     assert not list(out.glob("*raw*"))
+    saved_summary = json.loads((out / "inference_summary.json").read_text())
+    assert "waveform_samples" not in saved_summary
+    assert not list(out.glob("*waveform*"))
     loaded, _ = inference.read_inference_summary(result["inference_id"], experiments)
     assert loaded["model"]["model_name"] == "Fixture model"
     explanation = inference.explain_inference_beat(
@@ -141,6 +167,10 @@ def test_execute_inference_persists_beat_results_without_raw_signal(tmp_path, mo
     )
     assert explanation["explanation"]["available"] is True
     assert explanation["explanation"]["details"]["active_rule_count"] == 2
+    with inference._WAVEFORM_CACHE_LOCK:
+        inference._WAVEFORM_CACHE.pop(result["inference_id"], None)
+    with pytest.raises(inference.WaveformPreviewUnavailable, match="no longer in memory"):
+        inference.get_inference_waveform(result["inference_id"], 0, experiments)
 
 
 def test_model_resolution_rejects_arbitrary_model_paths(tmp_path):

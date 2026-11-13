@@ -14,19 +14,18 @@ web/index.html
                             rough-set selector, fuzzy rules, evaluation
 ```
 
-The original ECG Analysis, Feature Extraction, Rough Set, Fuzzy and Model Evaluation screens remain a client-side synthetic demonstration. They do not call Python models or claim MIT-BIH performance. The new Research Backend screen calls the local API to display service / dataset status, start Python research jobs and inspect saved Python outputs.
+The original ECG Analysis, Feature Extraction, Rough Set, Fuzzy and Model Evaluation screens remain a client-side synthetic demonstration. They do not call Python models or claim MIT-BIH performance. The Research Backend screen calls the local API to display service / dataset status, start Python research jobs and inspect saved Python outputs. The Model Inference page discovers locally saved models, submits ECG uploads, and displays beat predictions, explainability and drift diagnostics. A selected-beat waveform preview is served from a bounded process-memory cache and is not persisted.
 
 ### Phase 4 API integration
 
 ```text
 Browser /web/  ── same-origin JSON requests ──>  server.py (FastAPI)
-                                                   ├── /api/health
-                                                   ├── /api/dataset/status
-                                                   ├── dataset audit jobs
-                                                   ├── R-peak validation jobs
-                                                   ├── classifier experiment jobs
-                                                   ├── saved experiment summaries
-                                                   └── safe report downloads
+                                                   ├── /api/health and dataset status
+                                                   ├── dataset audit / R-peak / experiment jobs
+                                                   ├── saved experiment summaries and reports
+                                                   ├── saved model catalog and ECG inference
+                                                   ├── beat-level explanation / waveform preview
+                                                   └── allow-listed inference artifacts
                                                                │
                                                                ▼
                                                        modules.pipeline
@@ -62,6 +61,10 @@ modules.feature_extraction + feature_schema
         └─────────────────────────────────────────┘
         ↓
 modules.metrics + pipeline
+        ├── grouped OOF temperature calibration (training groups only)
+        ├── held-out score reliability diagnostics
+        ├── model-specific global explainability summaries
+        └── training feature reference quantiles
         ↓
 experiments/<run_id>/ + models/<run_id>/
 ```
@@ -101,3 +104,11 @@ The integrated API is intended to bind only to `127.0.0.1`. It has no authentica
 ## 7. Non-clinical status
 
 PulseLab is an academic research prototype. It is not a medical device, and its predictions must not be used for diagnosis, triage, treatment or clinical decisions.
+
+## 8. Phase 6 inference diagnostics
+
+- Score temperature is fitted from grouped out-of-fold training predictions (patient ID where available, otherwise record ID); fold-local median imputation avoids using OOF validation-fold feature statistics. The final held-out test set is used only for reliability evaluation.
+- Test reliability outputs include multiclass Brier / log loss, top-label ECE, classwise ECE and reliability bins. Scores keep their model-specific semantics and are not clinical probabilities.
+- Local inference explanation uses one-at-a-time training-median reference ablation. Global summaries use Random Forest impurity importance or fuzzy-rule antecedent usage. Neither is causal attribution.
+- New model manifests hold training-only feature quantile references. Inference compares new beat features to q01–q99 ranges as a descriptive domain-shift heuristic.
+- Selected-beat preprocessed, R-amplitude-normalised waveform windows are held in a bounded process-local cache for UI display. They are not persisted; restart or cache eviction clears previews.

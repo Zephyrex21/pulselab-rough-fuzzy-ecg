@@ -72,6 +72,8 @@ The first selected signal channel is used as the primary channel for R-peak dete
 | `GET` | `/api/inferences/{id}/beats/{index}/explanation` | On-demand explanation for one beat |
 | `GET` | `/api/inferences/{id}/artifacts/{name}` | Download allow-listed inference artifacts |
 
+Phase 6 adds `GET /api/inferences/{id}/beats/{index}/waveform` for a temporary selected-beat preview. See [`PHASE_6_EXPLAINABILITY_VALIDATION.md`](PHASE_6_EXPLAINABILITY_VALIDATION.md) for memory-only retention, calibration and explanation details.
+
 ## Persisted outputs and privacy boundary
 
 Each successful inference creates `experiments/inference_<id>/` containing:

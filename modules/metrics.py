@@ -193,3 +193,56 @@ def per_record_metrics_frame(model_name: str, y_true, y_pred, record_ids) -> pd.
             "classes_present": "".join(result["macro_classes_evaluated"]),
         })
     return pd.DataFrame(rows)
+
+
+def patient_cluster_bootstrap(
+    y_true,
+    y_pred,
+    patient_ids,
+    *,
+    n_bootstrap: int = 500,
+    seed: int = config.SEED,
+    class_order=None,
+) -> dict:
+    """Bootstrap held-out patients as the resampling unit.
+
+    Unlike beat bootstrap, this samples complete patient clusters and sums their
+    fixed-order confusion matrices. When only one patient is present, intervals
+    are not estimated and that limitation is reported explicitly.
+    """
+    result = record_cluster_bootstrap(
+        y_true, y_pred, patient_ids, n_bootstrap=n_bootstrap, seed=seed, class_order=class_order
+    )
+    result["method"] = "patient-cluster percentile bootstrap"
+    result["n_patients"] = int(result.pop("n_records", 0))
+    result["resampling_unit"] = "held-out patient"
+    if result.get("status") == "not_estimated":
+        result["reason"] = "At least two distinct held-out patients are required for a patient-cluster interval."
+    return result
+
+
+def per_patient_metrics_frame(model_name: str, y_true, y_pred, patient_ids, record_ids=None) -> pd.DataFrame:
+    """Summarise fixed-order class metrics separately for each held-out patient."""
+    truth, pred = np.asarray(y_true), np.asarray(y_pred)
+    patients = np.asarray(patient_ids).astype(str)
+    records = np.asarray(record_ids).astype(str) if record_ids is not None else np.full(len(truth), "", dtype=str)
+    if not (len(truth) == len(pred) == len(patients) == len(records)):
+        raise ValueError("y_true, y_pred, patient_ids and record_ids must have equal lengths")
+    rows = []
+    for patient in sorted(np.unique(patients)):
+        mask = patients == patient
+        result = evaluate_predictions(truth[mask], pred[mask], class_order=config.CLASSES)
+        patient_records = sorted(set(records[mask]) - {""})
+        rows.append({
+            "model": model_name,
+            "patient_id": patient,
+            "records": ";".join(patient_records),
+            "n_records": int(len(patient_records)),
+            "n_beats": int(mask.sum()),
+            "accuracy": result["accuracy"],
+            "balanced_accuracy": result["balanced_accuracy"],
+            "macro_f1_observed_classes": result["macro_f1"],
+            "macro_f1_all_aami": result["macro_f1_all_aami"],
+            "classes_present": "".join(result["macro_classes_evaluated"]),
+        })
+    return pd.DataFrame(rows)

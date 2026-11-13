@@ -35,14 +35,27 @@ def test_pipeline_runs_python_fuzzy_and_hybrid_models(tmp_path):
     assert (output / "model_comparison.csv").exists()
     assert (output / "per_class_metrics.csv").exists()
     assert (output / "per_record_model_metrics.csv").exists()
+    assert (output / "per_patient_model_metrics.csv").exists()
     assert (output / "test_predictions.csv").exists()
     assert (output / "research_report.md").exists()
+    report_text = (output / "research_report.md").read_text()
+    assert "Score calibration and reliability" in report_text
+    assert "Patient-level robustness" in report_text
     assert (output / "metrics.json").exists()
     assert (output / "a_fuzzy_all_features_rule_base.json").exists()
     assert (output / "b_rough_set_fuzzy_rule_base.json").exists()
     assert "model_reports" in manifest
     assert set(manifest["feature_medians"]) == {"f1", "f2", "f3"}
     assert all(np.isfinite(value) for value in manifest["feature_medians"].values())
+    assert set(manifest["feature_reference"]) == {"f1", "f2", "f3"}
+    assert (output / "a_fuzzy_all_features_score_calibration.json").exists()
+    assert (output / "a_fuzzy_all_features_score_reliability.json").exists()
+    assert (output / "a_fuzzy_all_features_global_explainability.json").exists()
+    assert manifest["metrics"]["A: Fuzzy (all features)"]["score_calibration"]["status"] == "fitted"
+    assert manifest["metrics"]["A: Fuzzy (all features)"]["patient_cluster_bootstrap"]["status"] == "estimated"
+    assert "score_N" in pd.read_csv(output / "test_predictions.csv").columns
+    patient_results = pd.read_csv(output / "per_patient_model_metrics.csv")
+    assert {"patient_id", "n_beats", "macro_f1_all_aami"}.issubset(patient_results.columns)
 
 
 def test_pipeline_rejects_record_overlap(tmp_path):

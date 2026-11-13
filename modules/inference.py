@@ -1,18 +1,20 @@
-"""Model registry and uploaded-signal inference for PulseLab Phase 5.
+"""Saved-model inference, explanations and ephemeral beat-waveform previews.
 
 Only locally trained PulseLab artifacts described by a run manifest are loaded.
-Uploaded raw ECG samples are processed in memory and are never persisted; only
-beat-level derived features, predictions and a summary are written under
-experiments/ for reproducibility.
+Uploaded full ECG signals are processed in memory and are never persisted.
+Derived beat features, predictions and summaries are saved for reproducibility;
+selected-beat waveform windows are held in a bounded in-memory cache only.
 """
 from __future__ import annotations
 
 import csv
+from collections import OrderedDict
 from datetime import datetime, timezone
 import io
 import json
 from pathlib import Path
 import re
+from threading import RLock
 from typing import Any
 from uuid import uuid4
 
@@ -21,7 +23,7 @@ import numpy as np
 import pandas as pd
 
 import config
-from modules import feature_extraction
+from modules import calibration, explainability, feature_extraction
 from modules.feature_schema import FEATURE_SCHEMA_VERSION
 
 RUN_ID_RE = re.compile(r"^[A-Za-z0-9_.-]{1,100}$")
@@ -30,6 +32,9 @@ MAX_UPLOAD_BYTES = 20 * 1024 * 1024
 MAX_SIGNAL_SAMPLES = 2_000_000
 MAX_DURATION_SECONDS = 10 * 60
 MIN_DURATION_SECONDS = 3.0
+_WAVEFORM_CACHE_MAX_SESSIONS = 2
+_WAVEFORM_CACHE: OrderedDict[str, np.ndarray] = OrderedDict()
+_WAVEFORM_CACHE_LOCK = RLock()
 TIME_COLUMN_NAMES = {
     "time", "timestamp", "time_s", "time_sec", "seconds", "sec", "sample",
     "sample_index", "sampleindex", "sample_no", "sample_number", "index", "unnamed: 0", "datetime", "date",
@@ -39,6 +44,65 @@ TIME_COLUMN_NAMES = {
 
 class InferenceError(ValueError):
     """A user-correctable input, model or inference validation error."""
+
+
+class WaveformPreviewUnavailable(InferenceError):
+    """The ephemeral selected-beat waveform is no longer in memory."""
+
+
+def _cache_inference_waveforms(inference_id: str, waveform_rows: np.ndarray) -> None:
+    """Keep a bounded set of derived, normalised beat windows in process memory."""
+    values = np.asarray(waveform_rows, dtype=np.float32)
+    if values.ndim != 2 or not len(values) or not np.isfinite(values).all():
+        return
+    with _WAVEFORM_CACHE_LOCK:
+        _WAVEFORM_CACHE[inference_id] = values.copy()
+        _WAVEFORM_CACHE.move_to_end(inference_id)
+        while len(_WAVEFORM_CACHE) > _WAVEFORM_CACHE_MAX_SESSIONS:
+            _WAVEFORM_CACHE.popitem(last=False)
+
+
+def get_inference_waveform(
+    inference_id: str,
+    beat_index: int,
+    experiments_dir: Path | str | None = None,
+) -> dict[str, Any]:
+    """Return one beat's normalised waveform from the process-local cache.
+
+    The full upload and beat waveform arrays are not written to disk. Previews
+    are intentionally temporary: they disappear after API restart or LRU eviction.
+    """
+    if not INFERENCE_ID_RE.fullmatch(str(inference_id)):
+        raise InferenceError("Invalid inference ID.")
+    summary, _ = read_inference_summary(inference_id, experiments_dir)
+    predictions = summary.get("predictions") or []
+    if not isinstance(beat_index, int) or beat_index < 0 or beat_index >= len(predictions):
+        raise InferenceError("Beat index is outside the inference result.")
+    with _WAVEFORM_CACHE_LOCK:
+        cached = _WAVEFORM_CACHE.get(inference_id)
+        if cached is not None:
+            _WAVEFORM_CACHE.move_to_end(inference_id)
+            samples = cached[beat_index].astype(float).tolist() if beat_index < len(cached) else None
+        else:
+            samples = None
+    if samples is None:
+        raise WaveformPreviewUnavailable(
+            "This waveform preview is no longer in memory (the server may have restarted or the preview cache was evicted). Re-run inference to view it. The ECG waveform is not retained on disk."
+        )
+    pre_samples = int(round(config.PRE_R_SEC * config.FS))
+    time_ms = ((np.arange(len(samples), dtype=float) - pre_samples) / float(config.FS) * 1000.0).tolist()
+    return {
+        "available": True,
+        "inference_id": inference_id,
+        "beat_index": beat_index,
+        "sampling_rate_hz": int(config.FS),
+        "r_peak_sample_in_window": pre_samples,
+        "time_ms": time_ms,
+        "samples": samples,
+        "amplitude_units": "R-amplitude-normalised units",
+        "retention": "process memory only; not persisted to disk",
+        "predicted_class": predictions[beat_index].get("predicted_class"),
+    }
 
 
 def _safe_path(path: Path, root: Path) -> Path:
@@ -120,6 +184,8 @@ def discover_saved_models(
                     "patient_disjoint": metadata.get("patient_disjoint"),
                     "feature_schema_version": manifest.get("feature_schema_version"),
                     "score_interpretation": (manifest.get("score_interpretation") or {}).get(model_name, "model score"),
+                    "score_temperature": float(((model_metrics or {}).get("score_calibration") or {}).get("temperature", (model_metrics or {}).get("score_temperature", 1.0))),
+                    "calibration_status": ((model_metrics or {}).get("score_calibration") or {}).get("status", "not_available"),
                 })
         except (OSError, ValueError, TypeError, json.JSONDecodeError, InferenceError):
             # One malformed historical run must not prevent discovery of other models.
@@ -165,6 +231,8 @@ def get_saved_model_entry(
         "n_channels": channel_count,
         "n_features": len(feature_columns),
         "score_interpretation": (manifest.get("score_interpretation") or {}).get(model_name, "model score"),
+        "score_temperature": float((model_metrics.get("score_calibration") or {}).get("temperature", model_metrics.get("score_temperature", 1.0))),
+        "calibration_status": (model_metrics.get("score_calibration") or {}).get("status", "not_available"),
     }
     return entry, artifact, manifest
 
@@ -273,8 +341,19 @@ def _normalise_score_matrix(scores: Any, classes: list[str], n_rows: int) -> np.
         array = array.reshape(-1, 1)
     if array.shape[0] != n_rows or array.shape[1] != len(classes):
         return None
-    array = np.nan_to_num(array, nan=0.0, posinf=0.0, neginf=0.0)
-    return array
+    if not np.isfinite(array).all():
+        return None
+    if np.any(array < 0):
+        shifted = array - array.max(axis=1, keepdims=True)
+        exp_values = np.exp(np.clip(shifted, -60, 60))
+        return exp_values / np.maximum(exp_values.sum(axis=1, keepdims=True), 1e-12)
+    array = np.clip(array, 0.0, None)
+    totals = array.sum(axis=1, keepdims=True)
+    zero = totals[:, 0] <= 1e-12
+    result = array / np.maximum(totals, 1e-12)
+    if zero.any():
+        result[zero] = 1.0 / max(len(classes), 1)
+    return result
 
 
 def execute_inference(
@@ -317,6 +396,9 @@ def execute_inference(
             X[column] = X[column].fillna(float(fallback))
     if X.isna().any().any() or not np.isfinite(X.to_numpy(dtype=float)).all():
         raise InferenceError("Feature extraction produced non-finite values that could not be resolved with training-only medians.")
+    drift_summary, drift_per_beat, drift_per_feature = explainability.assess_feature_drift(
+        X, manifest.get("feature_reference")
+    )
     try:
         predictions = np.asarray(model.predict(X)).astype(str)
     except Exception as exc:
@@ -330,6 +412,9 @@ def execute_inference(
     elif callable(getattr(model, "predict_proba", None)):
         raw_scores = model.predict_proba(X)
     score_matrix = _normalise_score_matrix(raw_scores, classes, len(X))
+    temperature = float(entry.get("score_temperature", 1.0))
+    if score_matrix is not None:
+        score_matrix = calibration.apply_temperature(score_matrix, temperature)
     all_classes = list(config.CLASSES)
     score_rows: list[dict[str, float] | None] = []
     top_scores: list[float | None] = []
@@ -346,6 +431,13 @@ def execute_inference(
     r_samples = feature_frame["r_sample"].to_numpy(dtype=int)
     beat_rows = []
     for index, (sample_index, prediction) in enumerate(zip(r_samples, predictions)):
+        class_score_values = np.asarray(list((score_rows[index] or {}).values()), dtype=float)
+        if len(class_score_values) and class_score_values.sum() > 0:
+            p = class_score_values / class_score_values.sum()
+            entropy = float(-np.sum(p * np.log(np.clip(p, 1e-12, 1.0))) / np.log(max(len(p), 2)))
+        else:
+            entropy = None
+        drift_count = int(drift_per_beat.iloc[index]["n_features_outside_training_q01_q99"]) if drift_per_beat is not None else None
         row = {
             "beat_index": int(index),
             "sample_index_360hz": int(sample_index),
@@ -353,6 +445,9 @@ def execute_inference(
             "predicted_class": str(prediction),
             "top_model_score": top_scores[index],
             "score_margin": margins[index],
+            "normalised_score_entropy": entropy,
+            "high_score_entropy": bool(entropy is not None and entropy >= 0.80),
+            "n_features_outside_training_range": drift_count,
             "class_scores": score_rows[index],
             "low_score_separation": bool(margins[index] is not None and margins[index] < 0.10),
         }
@@ -369,6 +464,9 @@ def execute_inference(
             "predicted_class": row["predicted_class"],
             "top_model_score": row["top_model_score"],
             "score_margin": row["score_margin"],
+            "normalised_score_entropy": row["normalised_score_entropy"],
+            "high_score_entropy": row["high_score_entropy"],
+            "n_features_outside_training_range": row["n_features_outside_training_range"],
             "low_score_separation": row["low_score_separation"],
             **{f"score_{label}": (row["class_scores"] or {}).get(label) for label in all_classes},
         }
@@ -376,6 +474,11 @@ def execute_inference(
     ])
     prediction_frame.to_csv(output_dir / "beat_predictions.csv", index=False)
     feature_frame.to_csv(output_dir / "beat_features.csv", index=False)
+    artifacts = ["beat_predictions.csv", "beat_features.csv", "inference_summary.json"]
+    if drift_per_beat is not None and drift_per_feature is not None:
+        drift_per_beat.to_csv(output_dir / "feature_drift_per_beat.csv", index=False)
+        drift_per_feature.to_csv(output_dir / "feature_drift_by_feature.csv", index=False)
+        artifacts.extend(["feature_drift_per_beat.csv", "feature_drift_by_feature.csv"])
     counts = {label: int((predictions == label).sum()) for label in all_classes}
     warnings = [
         "The model was trained on MIT-BIH recordings. Different ECG devices, lead placements, acquisition settings or patient populations may cause domain shift.",
@@ -383,6 +486,11 @@ def execute_inference(
     ]
     if input_meta["rows_dropped_after_interpolation"]:
         warnings.append(f"{input_meta['rows_dropped_after_interpolation']} rows with incomplete samples were excluded after short-gap interpolation.")
+    if drift_summary and drift_summary.get("high_drift_flag"):
+        warnings.append(
+            "A notable fraction of extracted beat features falls outside the training 1st–99th percentile ranges. "
+            "Review the feature-drift report; this is a descriptive domain-shift warning, not a diagnosis or automatic rejection."
+        )
     unexpected_labels = sorted(set(predictions) - set(all_classes))
     if unexpected_labels:
         warnings.append(f"The model returned labels outside the expected AAMI N/S/V/F/Q set: {unexpected_labels}. Review the selected run.")
@@ -407,17 +515,44 @@ def execute_inference(
             "training_split_protocol": manifest.get("metadata", {}).get("split_policy"),
             "patient_disjoint_training": manifest.get("metadata", {}).get("patient_disjoint"),
             "feature_schema_version": manifest.get("feature_schema_version"),
+            "score_temperature": temperature,
+            "calibration_status": entry.get("calibration_status", "not_available"),
         },
         "n_predictions": len(beat_rows),
+        "waveform_preview_available": bool(output.get("beats") and len(output.get("beats", [])) > 0),
         "class_counts": counts,
         "score_interpretation": entry["score_interpretation"],
-        "score_note": "Scores are model-specific ranking/normalised outputs. They are not calibrated probabilities or clinical risk estimates.",
+        "score_note": ("Scores use a scalar temperature fitted from grouped out-of-fold MIT-BIH training records; test/consumer uploads are not used to refit it. This internal calibration is not external or clinical validation." if entry.get("calibration_status") == "fitted" else "Scores are model-specific normalised outputs; a calibration transform was not fitted for this run. They are not clinical probabilities or risk estimates."),
+        "feature_drift": drift_summary,
+        "explainability": {
+            "local_method": "single-feature replacement with training median",
+            "global_method": "model-native or fuzzy-rule summary where available",
+            "limitations": [
+                "Local feature effects are sensitivity analyses, not causal explanations or SHAP values.",
+                "Correlated features can make one-at-a-time replacement effects misleading.",
+            ],
+        },
         "warnings": warnings,
-        "artifacts": ["beat_predictions.csv", "beat_features.csv", "inference_summary.json"],
+        "artifacts": artifacts,
         "disclaimer": config.DISCLAIMER,
         "predictions": beat_rows,
     }
+    # Cache only the selected-channel normalised beat windows. The full uploaded
+    # signal and waveform preview arrays are deliberately absent from disk.
+    beat_windows = None
+    try:
+        # process_signal's ``beats`` arrays already contain only complete
+        # windows (segment_beats has applied its valid mask).
+        beat_windows_all = np.asarray(output.get("beats", [])[0], dtype=float)
+        if beat_windows_all.ndim == 2:
+            beat_windows = beat_windows_all
+    except (IndexError, TypeError, ValueError):
+        beat_windows = None
+    waveform_ready = beat_windows is not None and len(beat_windows) == len(beat_rows)
+    summary["waveform_preview_available"] = bool(waveform_ready)
     (output_dir / "inference_summary.json").write_text(json.dumps(summary, indent=2, allow_nan=False), encoding="utf-8")
+    if waveform_ready:
+        _cache_inference_waveforms(inference_id, beat_windows)
     return summary
 
 
@@ -467,23 +602,47 @@ def explain_inference_beat(
     prediction_row = predictions[beat_index]
     explanation: dict[str, Any]
     model = joblib.load(artifact_path)
+    details: dict[str, Any] = {}
     explain = getattr(model, "explain", None)
     if callable(explain):
         try:
-            explanation = explain(row)
+            # Keep Phase 5's flat fuzzy explanation keys for backward-compatible clients.
+            details.update(_json_clean(explain(row)))
         except Exception as exc:
-            raise InferenceError(f"The model explanation failed: {type(exc).__name__}: {exc}") from exc
-        explanation = {
-            "available": True,
-            "method": "fuzzy rule activation",
-            "details": _json_clean(explanation),
-        }
-    else:
-        explanation = {
+            raise InferenceError(f"The model rule explanation failed: {type(exc).__name__}: {exc}") from exc
+    try:
+        details["local_feature_ablation"] = _json_clean(explainability.local_reference_ablation(
+            model,
+            row,
+            feature_columns=feature_columns,
+            reference_values={name: float(value) for name, value in training_medians.items() if value is not None},
+            target_class=str(prediction_row.get("predicted_class", "")),
+            temperature=float(entry.get("score_temperature", 1.0)),
+            top_k=15,
+        ))
+    except (ValueError, TypeError, KeyError) as exc:
+        details["local_feature_ablation"] = {
             "available": False,
-            "method": "model score summary",
-            "message": "This model type does not expose rule-level explanations. Its class scores are shown for transparency, but feature attribution is not available.",
+            "method": "single-feature reference ablation",
+            "message": f"Local feature sensitivity could not be calculated: {exc}",
+            "features": [],
         }
+    global_summary = _json_clean(explainability.global_feature_summary(model))
+    available = bool(
+        callable(explain)
+        or (details.get("local_feature_ablation") or {}).get("available")
+    )
+    explanation = {
+        "available": available,
+        "method": "fuzzy rule activation and/or single-feature reference ablation",
+        "details": details,
+        "global_explainability": global_summary,
+        "limitations": [
+            "The local ablation changes one input feature at a time to its training median; it is not causal and is not SHAP.",
+            "Correlated features can make isolated perturbations misleading.",
+            "Importance summaries describe model behaviour, not physiological causation.",
+        ],
+    }
     return {
         "inference_id": inference_id,
         "beat_index": beat_index,

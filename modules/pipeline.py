@@ -14,12 +14,13 @@ import numpy as np
 import pandas as pd
 
 import config
-from modules import baseline_models, data_loader, feature_extraction
+from modules import baseline_models, calibration, data_loader, explainability, feature_extraction
 from modules.feature_schema import FEATURE_SCHEMA_VERSION, feature_names as canonical_feature_names
 from modules.hybrid_model import FuzzyOnlyModel, HybridRoughFuzzy
 from modules.metrics import (
     align_class_scores, evaluate_predictions, per_class_frame,
-    per_record_metrics_frame, record_cluster_bootstrap,
+    per_record_metrics_frame, per_patient_metrics_frame,
+    record_cluster_bootstrap, patient_cluster_bootstrap,
 )
 
 Progress = Callable[[float, str], None] | None
@@ -62,6 +63,7 @@ def _write_research_report(run_dir: Path, summary: pd.DataFrame, manifest: dict)
         f"- **Peak source:** `{metadata.get('peak_source', 'pre-extracted features')}`",
         f"- **Training beats:** {manifest['n_train']:,}",
         f"- **Testing beats:** {manifest['n_test']:,}",
+        f"- **Held-out patients:** {manifest.get('n_test_patients', 'not available')}",
         f"- **Input features:** {manifest['n_features']}",
         "",
         "> Research prototype only. Not clinically validated. Do not use for diagnosis or treatment decisions.",
@@ -85,7 +87,38 @@ def _write_research_report(run_dir: Path, summary: pd.DataFrame, manifest: dict)
             f"| {label} | {manifest['train_class_distribution'].get(label, 0):,} | "
             f"{manifest['test_class_distribution'].get(label, 0):,} |"
         )
-    lines.extend(["", "## Protocol notes", ""])
+    lines.extend(["", "## Score calibration and reliability", ""])
+    lines.append("| Model | Calibration status | Temperature | Held-out Brier | Held-out log loss | Top-label ECE |")
+    lines.append("|---|---|---:|---:|---:|---:|")
+    for model_name, model_metrics in (manifest.get("metrics") or {}).items():
+        calibration_result = model_metrics.get("score_calibration") or {}
+        reliability = (model_metrics.get("score_reliability") or {}).get("metrics") or {}
+        temperature = calibration_result.get("temperature")
+        lines.append(
+            f"| {model_name} | {calibration_result.get('status', 'not available')} | "
+            f"{float(temperature):.4f} | "
+            f"{float(reliability.get('multiclass_brier_score', float('nan'))):.4f} | "
+            f"{float(reliability.get('multiclass_log_loss', float('nan'))):.4f} | "
+            f"{float(reliability.get('top_label_expected_calibration_error', float('nan'))):.4f} |"
+        )
+    lines.extend(["", "## Patient-level robustness", ""])
+    lines.append("| Model | Held-out patients | Accuracy 95% interval | Macro-F1 (all AAMI) 95% interval |")
+    lines.append("|---|---:|---:|---:|")
+    for model_name, model_metrics in (manifest.get("metrics") or {}).items():
+        cluster = model_metrics.get("patient_cluster_bootstrap") or {}
+        acc_ci = cluster.get("accuracy_95ci") or [None, None]
+        f1_ci = cluster.get("macro_f1_all_aami_95ci") or [None, None]
+        acc_text = f"{float(acc_ci[0]):.4f}–{float(acc_ci[1]):.4f}" if all(value is not None for value in acc_ci) else "not estimated"
+        f1_text = f"{float(f1_ci[0]):.4f}–{float(f1_ci[1]):.4f}" if all(value is not None for value in f1_ci) else "not estimated"
+        lines.append(f"| {model_name} | {cluster.get('n_patients', '—')} | {acc_text} | {f1_text} |")
+    lines.extend([
+        "",
+        "Patient-cluster bootstrap samples whole held-out patients rather than individual beats. The intervals describe variation among patients in this split; they do not establish external generalisation.",
+        "",
+        "Temperature scaling, when fitted, uses grouped out-of-fold training-record predictions and fold-specific training-only imputation. Held-out labels are used only for the reliability diagnostics above.",
+        "These are internal score diagnostics; they do not establish external or clinical calibration. Fuzzy and SVM score vectors retain model-specific semantics.",
+        "",
+        "## Protocol notes", ""])
     lines.extend(f"- {note}" for note in manifest.get("notes", []))
     if manifest.get("warnings"):
         lines.extend(["", "## Warnings", ""])
@@ -197,12 +230,17 @@ def run_feature_experiment(
     if save_models:
         model_dir.mkdir(parents=True, exist_ok=False)
 
+    # Keep an un-imputed copy for grouped OOF calibration. The calibrator fits
+    # its own imputation medians inside each training fold; final model fitting
+    # below continues to use the outer-training medians from _clean_feature_tables.
+    X_train_calibration = train_features.loc[:, columns].apply(pd.to_numeric, errors="coerce").replace([np.inf, -np.inf], np.nan).reset_index(drop=True)
     all_models = list(model_instances) if model_instances is not None else _model_suite(include_baselines)
     results: dict[str, dict] = {}
     model_reports: dict[str, dict] = {}
     summary_rows = []
     per_class_tables = []
     per_record_tables = []
+    per_patient_tables = []
     prediction_tables = []
     score_kinds = {}
     n_models = len(all_models)
@@ -211,7 +249,18 @@ def run_feature_experiment(
         model_name = getattr(model, "name", model.__class__.__name__)
         slug = _safe_slug(model_name)
         start = time.perf_counter()
-        _notify(progress, model_idx / max(n_models, 1), f"Training {model_name}")
+        _notify(progress, model_idx / max(n_models, 1), f"Training {model_name}: grouped out-of-fold score calibration")
+        calibration_info = calibration.fit_grouped_temperature_scaler(
+            model,
+            X_train_calibration,
+            y_train,
+            (train_df["patient_id"].astype(str).to_numpy() if "patient_id" in train_df.columns else
+             train_df["record"].astype(str).to_numpy() if "record" in train_df.columns else None),
+            class_order=config.CLASSES,
+            n_splits=3,
+            seed=config.SEED,
+        )
+        _notify(progress, model_idx / max(n_models, 1), f"Training final {model_name}")
         model.fit(X_train, y_train)
         train_seconds = time.perf_counter() - start
 
@@ -223,32 +272,70 @@ def run_feature_experiment(
         if hasattr(model, "scores"):
             score_raw = model.scores(X_test)
             score_matrix = align_class_scores(score_raw, model.classes_, config.CLASSES)
-            score_kind = "normalised fuzzy scores" if "Fuzzy" in model_name or "Rough" in model_name else "model ranking scores"
+            if "Fuzzy" in model_name or "Rough" in model_name:
+                score_kind = "normalised fuzzy rule scores (not calibrated probabilities)"
+            elif "SVM" in model_name:
+                score_kind = "softmax-transformed SVM decision ranking scores (not calibrated probabilities)"
+            elif "Random Forest" in model_name:
+                score_kind = "Random Forest class probability estimates (not post-hoc calibrated)"
+            else:
+                score_kind = "model-specific normalised ranking scores"
         elif hasattr(model, "predict_proba"):
             score_matrix = align_class_scores(model.predict_proba(X_test), model.classes_, config.CLASSES)
-            score_kind = "predictive scores"
+            score_kind = "estimator predict_proba output (not independently calibrated by PulseLab)"
 
+        if score_matrix is not None and calibration_info.get("status") == "fitted":
+            score_matrix = calibration.apply_temperature(score_matrix, calibration_info["temperature"])
+            score_kind = f"temperature-scaled {score_kind}; scalar temperature fitted from grouped OOF training scores"
         metrics = evaluate_predictions(y_test, predictions, score_matrix, config.CLASSES)
+        metrics["score_calibration"] = calibration_info
+        (run_dir / f"{slug}_score_calibration.json").write_text(
+            json.dumps(calibration_info, indent=2, default=_json_default), encoding="utf-8"
+        )
+        if score_matrix is not None:
+            reliability = calibration.score_reliability_diagnostics(
+                y_test, score_matrix, class_order=config.CLASSES,
+                score_semantics=score_kind, n_bins=10,
+            )
+            metrics["score_reliability"] = reliability
+            (run_dir / f"{slug}_score_reliability.json").write_text(
+                json.dumps(reliability, indent=2, default=_json_default), encoding="utf-8"
+            )
         if "record" in test_df.columns:
             test_records = test_df["record"].astype(str).to_numpy()
             bootstrap = record_cluster_bootstrap(y_test, predictions, test_records, n_bootstrap=500)
             metrics["record_cluster_bootstrap"] = bootstrap
             per_record_tables.append(per_record_metrics_frame(model_name, y_test, predictions, test_records))
+            test_patients = (test_df["patient_id"].astype(str).to_numpy() if "patient_id" in test_df.columns
+                             else np.asarray([config.patient_id_for_record(record) for record in test_records], dtype=str))
+            patient_bootstrap = patient_cluster_bootstrap(y_test, predictions, test_patients, n_bootstrap=500)
+            metrics["patient_cluster_bootstrap"] = patient_bootstrap
+            per_patient_tables.append(per_patient_metrics_frame(model_name, y_test, predictions, test_patients, test_records))
             prediction_rows = pd.DataFrame({
                 "record": test_records,
-                "patient_id": test_df.get("patient_id", pd.Series(test_records)).astype(str).to_numpy(),
+                "patient_id": test_patients,
                 "y_true": y_test,
                 "model": model_name,
                 "y_pred": predictions,
             })
+            if score_matrix is not None:
+                for score_index, class_label in enumerate(config.CLASSES):
+                    prediction_rows[f"score_{class_label}"] = score_matrix[:, score_index]
             prediction_tables.append(prediction_rows)
         else:
             metrics["record_cluster_bootstrap"] = {"status": "not_available", "reason": "No record IDs in test feature table."}
+            if "patient_id" in test_df.columns:
+                test_patients = test_df["patient_id"].astype(str).to_numpy()
+                metrics["patient_cluster_bootstrap"] = patient_cluster_bootstrap(y_test, predictions, test_patients, n_bootstrap=500)
+                per_patient_tables.append(per_patient_metrics_frame(model_name, y_test, predictions, test_patients))
+            else:
+                metrics["patient_cluster_bootstrap"] = {"status": "not_available", "reason": "No patient or record identifiers in test feature table."}
         metrics["train_seconds"] = float(train_seconds)
         metrics["predict_seconds"] = float(predict_seconds)
         metrics["n_features_input"] = int(X_train.shape[1])
         metrics["n_features_used"] = int(len(getattr(model, "selected_", columns)))
         metrics["score_interpretation"] = score_kind
+        metrics["score_temperature"] = float(calibration_info.get("temperature", 1.0))
         results[model_name] = metrics
         score_kinds[model_name] = score_kind
         summary_rows.append({
@@ -267,6 +354,10 @@ def run_feature_experiment(
             "accuracy_95ci_high": (metrics.get("record_cluster_bootstrap", {}).get("accuracy_95ci") or [None, None])[1],
             "macro_f1_all_aami_95ci_low": (metrics.get("record_cluster_bootstrap", {}).get("macro_f1_all_aami_95ci") or [None, None])[0],
             "macro_f1_all_aami_95ci_high": (metrics.get("record_cluster_bootstrap", {}).get("macro_f1_all_aami_95ci") or [None, None])[1],
+            "patient_accuracy_95ci_low": (metrics.get("patient_cluster_bootstrap", {}).get("accuracy_95ci") or [None, None])[0],
+            "patient_accuracy_95ci_high": (metrics.get("patient_cluster_bootstrap", {}).get("accuracy_95ci") or [None, None])[1],
+            "patient_macro_f1_all_aami_95ci_low": (metrics.get("patient_cluster_bootstrap", {}).get("macro_f1_all_aami_95ci") or [None, None])[0],
+            "patient_macro_f1_all_aami_95ci_high": (metrics.get("patient_cluster_bootstrap", {}).get("macro_f1_all_aami_95ci") or [None, None])[1],
         })
         per_class_tables.append(per_class_frame(model_name, metrics))
 
@@ -290,6 +381,11 @@ def run_feature_experiment(
                 "importance": model.m.feature_importances_,
             }).sort_values("importance", ascending=False)
             importance.to_csv(run_dir / f"{slug}_feature_importance.csv", index=False)
+        global_explanation = explainability.global_feature_summary(model)
+        model_reports.setdefault(model_name, {})["global_explainability"] = global_explanation
+        (run_dir / f"{slug}_global_explainability.json").write_text(
+            json.dumps(global_explanation, indent=2, default=_json_default), encoding="utf-8"
+        )
         if save_models:
             model_path = model_dir / f"{slug}.joblib"
             joblib.dump(model, model_path, compress=3)
@@ -304,6 +400,8 @@ def run_feature_experiment(
     pd.concat(per_class_tables, ignore_index=True).to_csv(run_dir / "per_class_metrics.csv", index=False)
     if per_record_tables:
         pd.concat(per_record_tables, ignore_index=True).to_csv(run_dir / "per_record_model_metrics.csv", index=False)
+    if per_patient_tables:
+        pd.concat(per_patient_tables, ignore_index=True).to_csv(run_dir / "per_patient_model_metrics.csv", index=False)
     if prediction_tables:
         pd.concat(prediction_tables, ignore_index=True).to_csv(run_dir / "test_predictions.csv", index=False)
 
@@ -348,9 +446,12 @@ def run_feature_experiment(
         # Persist training-only medians so uploaded-signal inference applies the
         # exact same missing-value policy without fitting on inference samples.
         "feature_medians": {str(name): float(value) for name, value in X_train.median(axis=0).fillna(0.0).items()},
+        "feature_reference": explainability.build_feature_reference(X_train, columns),
         "n_features": len(columns),
         "n_train": int(len(y_train)),
         "n_test": int(len(y_test)),
+        "n_train_patients": int(train_df["patient_id"].astype(str).nunique()) if "patient_id" in train_df.columns else None,
+        "n_test_patients": int(test_df["patient_id"].astype(str).nunique()) if "patient_id" in test_df.columns else (int(pd.Series([config.patient_id_for_record(r) for r in test_df["record"].astype(str)]).nunique()) if "record" in test_df.columns else None),
         "train_class_distribution": train_distribution,
         "test_class_distribution": test_distribution,
         "missing_train_classes": train_missing,
@@ -370,8 +471,12 @@ def run_feature_experiment(
             "In automatic-detection mode, classifier metrics are conditional on detected beats matched one-to-one to reference beats; detector FP/FN are reported separately.",
             "Fuzzy normalised scores and SVM ranking scores are not calibrated clinical probabilities.",
             "Record-cluster bootstrap intervals resample held-out records, not individual beats; they are descriptive uncertainty summaries.",
+            "Patient-cluster bootstrap intervals and per-patient metrics are also reported when patient identifiers are available (record identifiers are used as a documented fallback); these summaries describe held-out patient heterogeneity and are not external validation.",
             "The feature pipeline is offline / retrospective: zero-phase filtering, record-level R-amplitude scaling and next-RR features use full-record or future-beat context; it is not a validated streaming detector.",
-            "A single MIT-BIH split is not external validation or clinical validation."
+            "A single MIT-BIH split is not external validation or clinical validation.",
+            "When grouped training records support it, scalar temperature scaling is fitted only from grouped out-of-fold training scores; fold-specific imputation is fitted within each fold. The untouched test split is used only for evaluation. This is internal calibration, not external or clinical validation.",
+            "Held-out score reliability diagnostics (Brier, log loss and ECE) are computed after the training-only transform. Fuzzy and SVM outputs remain model score estimates and must not be interpreted as clinical risk probabilities.",
+            "Global feature summaries are model-native importance or fuzzy-rule usage summaries; they are not causal effects."
         ],
     }
     (run_dir / "run_manifest.json").write_text(json.dumps(run_manifest, indent=2, default=_json_default), encoding="utf-8")

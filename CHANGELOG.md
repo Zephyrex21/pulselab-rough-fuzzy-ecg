@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.6.0 — Phase 6: Explainability and Score Validation
+
+- Added grouped out-of-fold scalar temperature scaling using patient-grouped folds where patient IDs are available and record-grouped folds otherwise; held-out labels are never used to fit the transform.
+- Added fold-specific training-only median imputation during calibration OOF fits to avoid validation-fold feature statistics influencing the fold model.
+- Added held-out multiclass Brier score, log loss, top-label ECE, class-wise reliability bins and per-class score diagnostics.
+- Added per-patient held-out metrics and patient-cluster bootstrap intervals to make patient-level variation explicit.
+- Added local single-feature training-median reference ablation and global Random Forest / fuzzy-rule feature summaries, with explicit interpretation limitations.
+- Persisted training-only feature quantile references and added per-beat / per-feature inference drift reports.
+- Added selected-beat R-amplitude-normalised waveform previews with an in-memory-only bounded cache; preview samples are not written to disk.
+- Extended the inference UI and research report with calibration status, reliability metrics, waveform previews and explainability summaries.
+- Added deterministic tests for grouped calibration, held-out diagnostics, feature drift, local explanations and ephemeral waveform access.
+- Documented that internal score calibration and explainability do not establish external validation, clinical probability calibration or causal explanations.
+
 ## 0.5.0 — Phase 5: Saved-Model ECG Inference
 
 - Added a trusted saved-model catalog backed by MIT-BIH experiment manifests and existing model artifacts.

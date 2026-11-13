@@ -1,4 +1,4 @@
-"""PulseLab local API and web server (Phases 4–5).
+"""PulseLab local API and web server (Phases 4–6).
 
 Run from the repository root:
     py -m uvicorn server:app --host 127.0.0.1 --port 8000
@@ -38,7 +38,7 @@ app = FastAPI(
         "Local API for dataset QA, R-peak validation, reproducible MIT-BIH "
         "Rough-Fuzzy experiments, and saved-model ECG inference. Research use only; not a medical device."
     ),
-    version="0.5.0",
+    version="0.6.0",
     docs_url="/api/docs",
     redoc_url=None,
     openapi_url="/api/openapi.json",
@@ -457,6 +457,16 @@ def uploaded_inference_summary(inference_id: str):
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
+@app.get("/api/inferences/{inference_id}/beats/{beat_index}/waveform")
+def uploaded_inference_beat_waveform(inference_id: str, beat_index: int):
+    try:
+        return inference.get_inference_waveform(inference_id, beat_index, EXPERIMENTS_DIR)
+    except inference.WaveformPreviewUnavailable as exc:
+        raise HTTPException(status_code=410, detail=str(exc)) from exc
+    except inference.InferenceError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
 @app.get("/api/inferences/{inference_id}/beats/{beat_index}/explanation")
 def uploaded_inference_beat_explanation(inference_id: str, beat_index: int):
     try:
@@ -474,7 +484,7 @@ def download_inference_artifact(inference_id: str, artifact_name: str):
     output_dir = (EXPERIMENTS_DIR / inference_id).resolve()
     if output_dir.parent != EXPERIMENTS_DIR.resolve():
         raise HTTPException(status_code=400, detail="Invalid inference artifact path.")
-    allowed = {"inference_summary.json", "beat_predictions.csv", "beat_features.csv"}
+    allowed = {"inference_summary.json", "beat_predictions.csv", "beat_features.csv", "feature_drift_per_beat.csv", "feature_drift_by_feature.csv"}
     if artifact_name not in allowed:
         raise HTTPException(status_code=404, detail="Inference artifact not found.")
     path = output_dir / artifact_name

@@ -6,9 +6,9 @@ PulseLab is an academic research prototype for ECG signal processing, Rough Set 
 
 ## Current release
 
-**Version 0.5.0 — Phase 5: Saved-Model ECG Inference**
+**Version 0.6.0 — Phase 6: Explainability and Score Validation**
 
-Phase 5 adds a distinct **Model Inference** workspace. It discovers saved models from MIT-BIH experiment runs, accepts bounded CSV/TXT ECG uploads, runs the same Python preprocessing / R-peak / feature pipeline used by training, returns beat-level predictions, and provides fuzzy-rule explanations for model types that support them. The original browser ECG Analysis / Rough Set / Fuzzy demonstration remains explicitly synthetic; its predictions and metrics are not relabelled as MIT-BIH outputs.
+Phase 6 extends saved-model inference with grouped out-of-fold temperature scaling (training records only), held-out reliability diagnostics, local single-feature reference ablation, global model summaries, training-range drift checks, and selected-beat waveform previews. Waveform windows are kept in a bounded process-memory cache and are not written to disk. The original browser ECG Analysis / Rough Set / Fuzzy demonstration remains explicitly synthetic; its predictions and metrics are not relabelled as MIT-BIH outputs.
 
 ## 1. Run the integrated PulseLab application (recommended)
 
@@ -160,19 +160,21 @@ py -m pytest -q
 node tests/browser_core_smoke.test.js
 ```
 
-Phase 5 adds model-catalog, multipart upload, CSV parsing, saved artifact resolution, beat-level inference, explanation and inference artifact tests, alongside the Phase 4 API integration tests.
+Phase 6 adds grouped calibration, held-out reliability, explainability, feature-drift, ephemeral waveform-preview, and report-generation tests, alongside the Phase 4–5 API and inference tests.
 
 The Python tests use deterministic synthetic records / feature tables and dependency-injected detector functions for unit testing. They verify the algorithms and report generation; they do not substitute for running the full MIT-BIH dataset experiment.
 
-## 8. Run saved-model inference on an uploaded ECG (Phase 5)
+## 8. Run saved-model inference on an uploaded ECG (Phases 5–6)
 
 1. Complete a MIT-BIH experiment with **Save model artifacts** enabled in Research Backend, or run `py train.py --download` after the MIT-BIH dataset is ready.
 2. Start the integrated service with `py -m uvicorn server:app --host 127.0.0.1 --port 8000`.
 3. Open **Model Inference** in the sidebar. Refresh the model list, select a saved MIT-BIH model, upload a `.csv` or `.txt` file, and enter its sampling rate (100–2000 Hz).
 4. The upload must contain one or two numeric ECG signal columns, matching the selected model's channel count. A header is optional. Common named time/index columns are ignored; with headerless files, the first numeric columns are treated as ECG leads. Use the same lead order used during training.
-5. Review the detected beats, AAMI class outputs, model-specific scores and any available fuzzy-rule explanation. Download `beat_predictions.csv` for analysis.
+5. Review the detected beats, AAMI class outputs, score calibration status, training-range drift diagnostics and available rule / feature-sensitivity explanations. Select a beat to view its normalised waveform preview while the local API process remains running. Download `beat_predictions.csv` and the feature-drift reports for analysis.
 
 Upload constraints: 20 MB maximum; 3 seconds to 10 minutes; 100–2000 Hz; short internal missing-sample gaps may be interpolated. Raw uploaded samples are processed in memory and are not saved. Derived beat features, predictions and summary metadata are written to `experiments/inference_<id>/`. The upload route requires `python-multipart`, installed through `requirements.txt`.
+
+For Phase 6 details—including grouped out-of-fold temperature scaling, held-out reliability diagnostics, feature sensitivity, drift checks and ephemeral waveform preview retention—see [`docs/PHASE_6_EXPLAINABILITY_VALIDATION.md`](docs/PHASE_6_EXPLAINABILITY_VALIDATION.md).
 
 Inference is limited to saved models whose run manifest confirms the current MIT-BIH feature schema and whose `.joblib` artifact exists under `models/`. Models trained with annotation-guided peaks are flagged because inference uses automatic peak detection. Model scores are ranking/normalised outputs and are not calibrated probabilities. This is research software, not a medical device.
 
@@ -205,6 +207,7 @@ experiments/<run_id>/
     model_comparison.csv
     per_class_metrics.csv
     per_record_model_metrics.csv
+    per_patient_model_metrics.csv
     test_predictions.csv
     rpeak_detection_metrics.json
     rpeak_detection_per_record.csv
@@ -222,15 +225,19 @@ experiments/inference_<id>/
     inference_summary.json
     beat_predictions.csv
     beat_features.csv
+    feature_drift_per_beat.csv       # when training feature reference exists
+    feature_drift_by_feature.csv     # when training feature reference exists
 ```
+
+Selected-beat waveform previews are process-memory only and are not persisted. The cache retains up to two recent inference sessions and is cleared by an API restart.
 
 ## Metrics and interpretation
 
 Reported classifier metrics include accuracy, balanced accuracy, macro/weighted F1, per-class precision, sensitivity/recall, specificity, confusion matrices and one-vs-rest ROC-AUC / average precision when mathematically defined. Record-cluster bootstrap intervals are reported for accuracy and fixed-five-class macro-F1 when held-out record IDs are available.
 
-Fuzzy scores and SVM ranking scores are not calibrated clinical probabilities. In automatic-detection mode, classifier metrics describe only matched detected beats. Consider those alongside the separate detector sensitivity / PPV / F1 and the number of unmatched detections / reference beats.
+Where enough grouped training records and class support exist, Phase 6 fits a scalar temperature from grouped out-of-fold training scores; fold-specific imputation statistics are also fitted within each fold. The held-out test split is used only to calculate Brier score, log loss, top-label / classwise ECE and reliability bins. Inspect each model's calibration status and skip reason. This is internal calibration, not external or clinical validation. Fuzzy scores and SVM ranking scores retain model-specific semantics and are not calibrated clinical probabilities. In automatic-detection mode, classifier metrics describe only matched detected beats. Consider those alongside the separate detector sensitivity / PPV / F1 and the number of unmatched detections / reference beats.
 
-A single MIT-BIH split, even with record-cluster intervals, is not external validation or clinical validation. The current implementation is offline / retrospective: zero-phase filtering, record-level amplitude normalisation and the next-RR feature use future or whole-record context. It is not a validated streaming or real-time system.
+A single MIT-BIH split, even with record- and patient-cluster intervals and score calibration, is not external validation or clinical validation. Inspect `per_patient_model_metrics.csv` and patient-cluster intervals to understand performance variation across test subjects; these summaries do not replace repeated patient-disjoint cross-validation. Local single-feature reference ablation is a sensitivity diagnostic rather than SHAP or causal explanation. Training-range drift flags are descriptive q01–q99 comparisons; they do not prove a signal is invalid or suitable. The current implementation is offline / retrospective: zero-phase filtering, record-level amplitude normalisation and the next-RR feature use future or whole-record context. It is not a validated streaming or real-time system.
 
 ## Repository map
 

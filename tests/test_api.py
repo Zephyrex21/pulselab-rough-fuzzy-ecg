@@ -108,6 +108,8 @@ def test_frontend_exposes_research_backend_and_api_boundary():
     assert "backend:{label:'Research Backend'" in script
     assert "const API_BASE='/api'" in script
     assert "synthetic browser demonstration" in script
+    assert "Selected heartbeat waveform" in script
+    assert "/waveform" in script
 
 
 def test_saved_experiment_summary_and_artifact_download(tmp_path, monkeypatch):
@@ -297,3 +299,55 @@ def test_frontend_exposes_phase5_model_inference_workspace():
     assert "inferences/" in script
     assert "inference-class-distribution" in styles
     assert "Model Inference" in index or "PulseLab" in index
+
+
+def test_phase6_inference_drift_artifacts_are_allowlisted(tmp_path, monkeypatch):
+    inference_id = "inference_phase6_fixture"
+    output = tmp_path / inference_id
+    output.mkdir()
+    (output / "feature_drift_by_feature.csv").write_text("feature,outside_fraction\nf1,0.2\n")
+    monkeypatch.setattr(server, "EXPERIMENTS_DIR", tmp_path)
+    with TestClient(server.app) as client:
+        okay = client.get(f"/api/inferences/{inference_id}/artifacts/feature_drift_by_feature.csv")
+        denied = client.get(f"/api/inferences/{inference_id}/artifacts/../../secret.txt")
+    assert okay.status_code == 200
+    assert "outside_fraction" in okay.text
+    assert denied.status_code in (400, 404)
+
+
+def test_phase6_frontend_exposes_local_explainability_and_score_diagnostics():
+    script = (server.WEB_DIR / "app.js").read_text(encoding="utf-8")
+    styles = (server.WEB_DIR / "styles.css").read_text(encoding="utf-8")
+    assert "Local feature sensitivity" in script
+    assert "Training-range drift check" in script
+    assert "Held-out score reliability diagnostics" in script
+    assert "explainability-track" in styles
+
+
+def test_phase6_beat_waveform_preview_endpoint(monkeypatch):
+    from modules import inference
+
+    expected = {
+        "available": True, "inference_id": "inference_fixture_1234",
+        "beat_index": 0, "sampling_rate_hz": 360,
+        "r_peak_sample_in_window": 90, "time_ms": [-250.0, 0.0],
+        "samples": [0.1, 1.0], "amplitude_units": "R-amplitude-normalised units",
+        "retention": "process memory only; not persisted to disk", "predicted_class": "N",
+    }
+    monkeypatch.setattr(inference, "get_inference_waveform", lambda *args: expected)
+    with TestClient(server.app) as client:
+        response = client.get("/api/inferences/inference_fixture_1234/beats/0/waveform")
+    assert response.status_code == 200
+    assert response.json() == expected
+
+
+def test_phase6_waveform_endpoint_returns_gone_when_preview_was_evicted(monkeypatch):
+    from modules import inference
+
+    def unavailable(*args):
+        raise inference.WaveformPreviewUnavailable("Preview cache was evicted.")
+    monkeypatch.setattr(inference, "get_inference_waveform", unavailable)
+    with TestClient(server.app) as client:
+        response = client.get("/api/inferences/inference_fixture_1234/beats/0/waveform")
+    assert response.status_code == 410
+    assert "evicted" in response.json()["detail"]
