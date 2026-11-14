@@ -1,0 +1,17 @@
+{
+  "project": "PulseLab",
+  "run_id": "pulselab_patient_disjoint_detected_20261114T053618Z_5383",
+  "source_commit": "0bb5d33755c90616fa1b89a0a4835dae68a541da",
+  "python_version": "3.13.18",
+  "package_versions": {
+    "numpy": "2.1.3",
+    "pandas": "2.3.3",
+    "scipy": "1.16.3",
+    "scikit-learn": "1.6.1",
+    "wfdb": "4.3.1",
+    "PyWavelets": "1.10.0",
+    "joblib": "1.6.0",
+    "threadpoolctl": "3.7.0"
+  },
+  "important_note": "For reliable Joblib/scikit-learn loading, use the same Python minor version and install the exact package versions listed in the accompanying runtime requirements file."
+}
