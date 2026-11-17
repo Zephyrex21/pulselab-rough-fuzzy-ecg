@@ -38,7 +38,7 @@ app = FastAPI(
         "Local API for dataset QA, R-peak validation, reproducible MIT-BIH "
         "Rough-Fuzzy experiments, and saved-model ECG inference. Research use only; not a medical device."
     ),
-    version="0.6.0",
+    version="0.6.1",
     docs_url="/api/docs",
     redoc_url=None,
     openapi_url="/api/openapi.json",
@@ -53,20 +53,20 @@ _RUN_ID_RE = re.compile(r"^[A-Za-z0-9_.-]{1,100}$")
 
 
 class AuditRequest(BaseModel):
-    quick: bool = True
+    quick: bool = False
     download_missing: bool = False
     split_protocol: Literal["patient-disjoint", "de-chazal-record-wise"] = "patient-disjoint"
 
 
 class RPeakValidationRequest(BaseModel):
-    quick: bool = True
+    quick: bool = False
     download_missing: bool = False
     split_protocol: Literal["patient-disjoint", "de-chazal-record-wise"] = "patient-disjoint"
     tolerance_ms: int = Field(default=75, ge=25, le=150)
 
 
 class ExperimentRequest(BaseModel):
-    quick: bool = True
+    quick: bool = False
     download_missing: bool = False
     split_protocol: Literal["patient-disjoint", "de-chazal-record-wise"] = "patient-disjoint"
     peak_source: Literal["detected", "annotations"] = "detected"
@@ -311,6 +311,10 @@ def _read_experiment_summary(run_dir: Path) -> dict:
         "n_train": manifest.get("n_train"),
         "n_test": manifest.get("n_test"),
         "n_features": manifest.get("n_features"),
+        "n_train_patients": manifest.get("n_train_patients"),
+        "n_test_patients": manifest.get("n_test_patients"),
+        "n_train_records": len(manifest.get("train_records", [])),
+        "n_test_records": len(manifest.get("test_records", [])),
         "models": manifest.get("models", []),
         "train_class_distribution": manifest.get("train_class_distribution", {}),
         "test_class_distribution": manifest.get("test_class_distribution", {}),
@@ -350,7 +354,7 @@ def health():
 
 
 @app.get("/api/dataset/status")
-def dataset_status(split_protocol: Literal["patient-disjoint", "de-chazal-record-wise"] = "patient-disjoint", quick: bool = True):
+def dataset_status(split_protocol: Literal["patient-disjoint", "de-chazal-record-wise"] = "patient-disjoint", quick: bool = False):
     train_ids, test_ids = _split_records(split_protocol, quick)
     available = set(data_loader.available_records(config.DATA_DIR))
     requested = list(dict.fromkeys(train_ids + test_ids))
@@ -389,8 +393,15 @@ def create_rpeak_validation(request: RPeakValidationRequest, background_tasks: B
     return {"job_id": job_id, "status": "queued", "poll_url": f"/api/jobs/{job_id}"}
 
 
+def _experiment_running() -> bool:
+    with _JOBS_LOCK:
+        return any(j["kind"] == "experiment" and j["status"] not in _TERMINAL_STATES for j in _JOBS.values())
+
+
 @app.post("/api/experiments", status_code=202)
 def create_experiment(request: ExperimentRequest, background_tasks: BackgroundTasks):
+    if _experiment_running():
+        raise HTTPException(status_code=409, detail="An experiment is already running. Wait for it to finish before starting another.")
     params = request.model_dump()
     job_id = _create_job("experiment", params)
     background_tasks.add_task(_run_job, job_id, lambda progress: _run_experiment_job(job_id, request, progress))
@@ -512,6 +523,8 @@ def list_experiments(limit: int = 20):
                     "created_at_utc": manifest.get("created_at_utc"),
                     "n_train": manifest.get("n_train"),
                     "n_test": manifest.get("n_test"),
+                    "n_train_records": len(manifest.get("train_records", [])),
+                    "n_test_records": len(manifest.get("test_records", [])),
                     "models": manifest.get("models", []),
                     "peak_source": manifest.get("metadata", {}).get("peak_source"),
                     "split_protocol": manifest.get("metadata", {}).get("split_policy"),

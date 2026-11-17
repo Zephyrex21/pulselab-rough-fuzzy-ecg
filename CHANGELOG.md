@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.6.1 — Bug-fix and UI pass
+
+**Signal processing**
+- Replaced the single global R-peak threshold with a locally adaptive threshold (candidate energy compared with the median of neighbouring beats, plus a noise floor). The old detector missed ~10% of MIT-BIH beats overall and almost all beats in records with strongly varying QRS amplitude (record 228: 14% sensitivity, 114: 22%). Across the 43 study records, sensitivity rose from ~89.7% to ~99.1% with PPV ~99.4%. Because the missed beats were not random, previously trained models should be retrained.
+
+**Inference / API**
+- ECG upload parser no longer treats a time or sample-index column as an ECG lead when the column is called e.g. "sample interval" or "ms", or has no header: monotonic, evenly stepped columns are detected from the data and skipped.
+- The experiment summary now exposes `n_train_patients`, `n_test_patients` and record counts (the "held-out patients" tile previously always showed a dash).
+- Only one experiment can run at a time (HTTP 409 otherwise).
+- Audit, R-peak validation, experiment and dataset-status requests now default to the full dataset (`quick=false`); quick runs must be requested explicitly.
+
+**Web interface**
+- Fixed a crash (`inferenceExplanation is not defined`) that stopped the Model Inference results from rendering after any successful run.
+- Backend and Inference forms keep their values (quick subset, tolerance, selected file, sampling rate) when the view re-renders after a refresh, job completion or beat selection.
+- Dataset status now follows the Quick subset / split controls instead of always reporting the quick subset; Quick subset is unchecked by default.
+- Removed the "Simulation mode" card from the sidebar; the sidebar is now scrollable so the bottom entries are never clipped on short screens.
+- New collapsible sidebar (icon rail with tooltips, Ctrl/Cmd+B shortcut, remembered between visits) with navigation grouped into "Synthetic demo" and "MIT-BIH · Python".
+- Page subtitle chip now reflects the current workspace; stale "0.5" title and "Phases 4–5" wording removed; a failure while training the browser demo no longer leaves the loading screen stuck.
+
 ## 0.6.0 — Phase 6: Explainability and Score Validation
 
 - Added grouped out-of-fold scalar temperature scaling using patient-grouped folds where patient IDs are available and record-grouped folds otherwise; held-out labels are never used to fit the transform.

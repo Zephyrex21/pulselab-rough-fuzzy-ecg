@@ -39,7 +39,27 @@ TIME_COLUMN_NAMES = {
     "time", "timestamp", "time_s", "time_sec", "seconds", "sec", "sample",
     "sample_index", "sampleindex", "sample_no", "sample_number", "index", "unnamed: 0", "datetime", "date",
     "times", "time_ms", "timesec", "elapsed_time", "elapsedtime",
+    "ms", "millis", "milliseconds", "sample_interval", "sampleinterval", "interval", "t", "no", "n", "id",
+    "sample_no", "samplenumber", "sample_num", "idx",
 }
+
+
+def _is_time_like_column(values: np.ndarray) -> bool:
+    """True for a strictly increasing, evenly stepped column (a time or sample-index axis).
+
+    ECG leads are never perfectly monotonic with a constant step, so this recognises index/time
+    columns even when the file has no header or an unfamiliar header name.
+    """
+    v = np.asarray(values, dtype=float)
+    v = v[np.isfinite(v)]
+    if len(v) < 8:
+        return False
+    d = np.diff(v)
+    mean_step = float(np.mean(d))
+    if mean_step <= 0 or not np.all(d > 0):
+        return False
+    return float(np.std(d)) <= 0.02 * mean_step
+
 
 
 class InferenceError(ValueError):
@@ -280,16 +300,22 @@ def parse_ecg_csv(content: bytes, expected_channels: int, sampling_rate_hz: floa
         raise InferenceError("No numeric ECG samples were found after the header.")
     matrix = np.asarray([[np.nan if value is None else value for value in row] for row in parsed], dtype=float)
     candidates = []
+    skipped_time_columns: list[str] = []
     for index, name in enumerate(headers):
         normalized = re.sub(r"[^a-z0-9_:]+", "", name.lower())
         if has_header and normalized in {re.sub(r"[^a-z0-9_:]+", "", n) for n in TIME_COLUMN_NAMES}:
+            skipped_time_columns.append(name)
             continue
         valid_ratio = float(np.isfinite(matrix[:, index]).mean())
         if valid_ratio >= 0.98:
+            if _is_time_like_column(matrix[:, index]):
+                skipped_time_columns.append(headers[index])
+                continue
             candidates.append(index)
     if len(candidates) < expected_channels:
         raise InferenceError(
-            f"Could not identify {expected_channels} numeric ECG channel(s). Ensure the signal columns contain numeric samples."
+            f"Could not identify {expected_channels} numeric ECG channel(s) after skipping time/index column(s) "
+            f"{skipped_time_columns or 'none'}. Provide {expected_channels} numeric ECG lead columns."
         )
     chosen = candidates[:expected_channels]
     signal = matrix[:, chosen]
@@ -317,6 +343,7 @@ def parse_ecg_csv(content: bytes, expected_channels: int, sampling_rate_hz: floa
     metadata = {
         "channel_names": [headers[index] for index in chosen],
         "numeric_columns_detected": len(candidates),
+        "time_or_index_columns_skipped": skipped_time_columns,
         "rows_dropped_after_interpolation": dropped_rows,
         "n_samples": int(len(signal)),
         "duration_seconds": float(duration),

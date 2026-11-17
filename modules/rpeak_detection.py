@@ -4,7 +4,22 @@ import numpy as np
 from scipy import signal as sps
 
 
-def detect_rpeaks(x, fs, refractory: float = 0.25) -> np.ndarray:
+def detect_rpeaks(
+    x,
+    fs,
+    refractory: float = 0.25,
+    relative_threshold: float = 0.20,
+    noise_floor_fraction: float = 0.06,
+    neighbour_beats: int = 8,
+) -> np.ndarray:
+    """Pan-Tompkins-style detector with a locally adaptive threshold.
+
+    A single global threshold (the earlier implementation) discards genuine beats in records whose QRS
+    amplitude varies strongly (for example MIT-BIH 114 and 228), which also removed beats
+    non-randomly from the classifier's training/test tables. Candidates are therefore accepted when
+    their integrated-slope energy reaches ``relative_threshold`` of the median energy of the
+    ``neighbour_beats`` candidates on each side, and an absolute noise floor rejects baseline noise.
+    """
     x = np.asarray(x, dtype=float)
     if x.ndim != 1 or len(x) < 8:
         raise ValueError("R-peak detection requires a one-dimensional signal with at least 8 samples")
@@ -19,9 +34,21 @@ def detect_rpeaks(x, fs, refractory: float = 0.25) -> np.ndarray:
     sq = np.gradient(f) ** 2
     win = max(int(0.12 * fs), 1)
     integ = np.convolve(sq, np.ones(win) / win, mode="same")
-    thr = 0.3 * np.percentile(integ, 99.5) if np.any(integ) else 0
-    peaks, _ = sps.find_peaks(integ, height=thr, distance=max(int(refractory * fs), 1))
-    return refine_peaks(x, peaks, fs)
+    if not np.any(integ):
+        return np.array([], dtype=int)
+    reference_level = np.percentile(integ, 99.5)
+    candidates, _ = sps.find_peaks(
+        integ, height=noise_floor_fraction * reference_level, distance=max(int(refractory * fs), 1)
+    )
+    if len(candidates) == 0:
+        return np.array([], dtype=int)
+    heights = integ[candidates]
+    n_side = max(int(neighbour_beats), 1)
+    keep = np.zeros(len(candidates), dtype=bool)
+    for i in range(len(candidates)):
+        local = np.median(heights[max(0, i - n_side): i + n_side + 1])
+        keep[i] = heights[i] >= relative_threshold * local
+    return refine_peaks(x, candidates[keep], fs)
 
 
 def refine_peaks(x, peaks, fs, half_window: float = 0.05) -> np.ndarray:

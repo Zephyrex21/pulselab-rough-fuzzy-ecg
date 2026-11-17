@@ -6,7 +6,7 @@ PulseLab is an academic research prototype for ECG signal processing, Rough Set 
 
 ## Current release
 
-**Version 0.6.0 — Phase 6: Explainability and Score Validation**
+**Version 0.6.1 — Phase 6 + bug-fix and UI pass**
 
 Phase 6 extends saved-model inference with grouped out-of-fold temperature scaling (training records only), held-out reliability diagnostics, local single-feature reference ablation, global model summaries, training-range drift checks, and selected-beat waveform previews. Waveform windows are kept in a bounded process-memory cache and are not written to disk. The original browser ECG Analysis / Rough Set / Fuzzy demonstration remains explicitly synthetic; its predictions and metrics are not relabelled as MIT-BIH outputs.
 
