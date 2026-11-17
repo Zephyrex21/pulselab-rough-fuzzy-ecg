@@ -220,6 +220,7 @@ def test_phase5_full_multipart_inference_round_trip(tmp_path, monkeypatch):
     import numpy as np
     import pandas as pd
     from modules.feature_schema import FEATURE_SCHEMA_VERSION, feature_names
+    from modules.pipeline_contract import current_mitbih_inference_contract
 
     run_id = "api-inference-fixture"
     experiments = tmp_path / "experiments"
@@ -241,6 +242,7 @@ def test_phase5_full_multipart_inference_round_trip(tmp_path, monkeypatch):
             "peak_source": "detected",
             "split_policy": "patient-disjoint",
             "patient_disjoint": True,
+            "inference_pipeline_contract": current_mitbih_inference_contract(),
         },
         "score_interpretation": {"Fixture API model": "test model scores"},
         "metrics": {"Fixture API model": {"model_artifact": f"models/{run_id}/{artifact.name}"}},
