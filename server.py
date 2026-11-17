@@ -488,6 +488,13 @@ def bidmc_record_predictions(record_id: str, model: Literal["ecg_ppg", "ppg_only
     try:
         record = bidmc_pipeline.load_record(record_id, config.BIDMC_DATA_DIR)
         result = bidmc_inference.predict_record(record, registry["models_loaded"], model)
+        identity_audit = bidmc_identity.audit_patient_identity(config.BIDMC_DATA_DIR)
+        verified_patient = (identity_audit.get("record_to_patient") or {}).get(record.record_id)
+        result["patient_id"] = verified_patient
+        result["patient_identity_verified"] = verified_patient is not None
+        result["patient_identity_status"] = "verified" if verified_patient else "unverified"
+        if verified_patient is None:
+            result["patient_identity_note"] = "The WFDB header did not provide an unambiguous MIMIC-II subject ID. This single-record replay is not evidence of patient-level grouping."
         return _json_safe(result)
     except bidmc_pipeline.BIDMCError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -499,7 +506,13 @@ def bidmc_record_predictions(record_id: str, model: Literal["ecg_ppg", "ppg_only
 def bidmc_record_preview(record_id: str, start_sec: float = 0.0, duration_sec: float = 20.0):
     try:
         record = bidmc_pipeline.load_record(record_id, config.BIDMC_DATA_DIR)
-        return _json_safe(bidmc_pipeline.extract_preview(record, start_sec, duration_sec))
+        preview = bidmc_pipeline.extract_preview(record, start_sec, duration_sec)
+        identity_audit = bidmc_identity.audit_patient_identity(config.BIDMC_DATA_DIR)
+        verified_patient = (identity_audit.get("record_to_patient") or {}).get(record.record_id)
+        preview["patient_id"] = verified_patient
+        preview["patient_identity_verified"] = verified_patient is not None
+        preview["patient_identity_status"] = "verified" if verified_patient else "unverified"
+        return _json_safe(preview)
     except bidmc_pipeline.BIDMCError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
