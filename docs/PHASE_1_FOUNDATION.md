@@ -1,3 +1,5 @@
+> **Historical implementation note:** This document records an earlier development phase. The synthetic browser ECG demonstration described here was removed in PulseLab 0.7.0; the current browser only calls the real Python research APIs.
+
 # Phase 1 — Foundation and interface system
 
 ## Objective
@@ -26,9 +28,9 @@ These items require separate algorithmic implementation and validation. Mixing t
 
 ## Verification performed
 
-- `node --check web/core.js`
 - `node --check web/app.js`
-- `node tests/browser_core_smoke.test.js`
+- `node --check web/app.js`
+- `node --check web/app.js`
 - Executed the existing browser training function in Node to verify the deterministic synthetic benchmark still completes.
 - Added a dependency-free Node smoke test to preserve key browser-model contracts.
 - Verified the current benchmark output: 1,228 synthetic training beats, 430 synthetic test beats, 25 browser features, 9 selected attributes, 60 rules in the fuzzy-only model and 60 rules in the rough-set/fuzzy model.

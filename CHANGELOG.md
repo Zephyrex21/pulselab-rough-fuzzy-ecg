@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.7.0 — Dual real-data research engines
+
+**Browser application**
+- Removed the browser-only synthetic ECG generator, simulated waveform renderer, browser-side model training and simulated prediction path.
+- Rebuilt the web interface as an API client for the Python research engines.
+- Added separate MIT-BIH ECG and BIDMC multimodal workspaces; BIDMC displays real dataset availability and extracted signal previews, not untrained predictions.
+
+**BIDMC research pipeline**
+- Added BIDMC dataset discovery, metadata inventory, patient-group identification and loading of ECG II, PPG/PLETH, RESP, monitor numerics and dual manual breath annotations.
+- Added aligned window-level features for each modality and multimodal fusion.
+- Added a leakage-controlled respiratory-rate feature export that excludes RESP-derived predictors when the target is derived from RESP breath annotations.
+- Added a Rough-Set + fuzzy respiratory-rate regression model interface; training and evaluation are deliberately deferred to the user's next Kaggle run.
+- Added BIDMC status, signal-preview and asynchronous feature-export API endpoints.
+
+**MIT-BIH artifacts and reproducibility**
+- Bundled the supplied patient-disjoint MIT-BIH model artifacts and experiment reports.
+- Preserved the original training manifest and prominently documented the source-version mismatch: the supplied models were trained using 0.6.0, while the shipped preprocessing uses the adaptive detector from 0.6.1. Re-training is recommended.
+
+**Validation**
+- Removed the obsolete browser demo smoke test and replaced it with API/front-end and BIDMC pipeline tests.
+- Verified the BIDMC loader and feature extractor against a real uploaded BIDMC record.
+
 ## 0.6.1 — Bug-fix and UI pass
 
 **Signal processing**

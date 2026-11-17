@@ -1,3 +1,5 @@
+> **Historical implementation note:** This document records an earlier development phase. The synthetic browser ECG demonstration described here was removed in PulseLab 0.7.0; the current browser only calls the real Python research APIs.
+
 # Phase 5 — Saved-model ECG inference
 
 ## Purpose

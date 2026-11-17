@@ -6,12 +6,20 @@ __pycache__/
 venv/
 .env
 
-# Local datasets and generated experiment artifacts
+# Local datasets are not bundled
 /data/mitdb/
+/data/bidmc/
+
+# Generated experiment artifacts are ignored except the explicitly supplied
+# reproducible MIT-BIH training run distributed with PulseLab 0.7.0.
 /experiments/*
 !/experiments/.gitkeep
+!/experiments/pulselab_patient_disjoint_detected_20261114T053618Z_5383/
+!/experiments/pulselab_patient_disjoint_detected_20261114T053618Z_5383/**
 /models/*
 !/models/.gitkeep
+!/models/pulselab_patient_disjoint_detected_20261114T053618Z_5383/
+!/models/pulselab_patient_disjoint_detected_20261114T053618Z_5383/**
 
 # Editor / OS
 .vscode/

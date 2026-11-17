@@ -1,0 +1,540 @@
+{
+  "status": "computed",
+  "n_samples": 44157,
+  "n_bins": 10,
+  "score_semantics": "temperature-scaled normalised fuzzy rule scores (not calibrated probabilities); scalar temperature fitted from grouped OOF training scores",
+  "normalisation": "each score row divided by its non-negative row sum; all-zero rows replaced by uniform scores",
+  "metrics": {
+    "multiclass_brier_score": 0.23512690885127652,
+    "multiclass_log_loss": 0.5153275985689885,
+    "top_label_expected_calibration_error": 0.22729505328736735,
+    "top_label_accuracy": 0.9324908847974274,
+    "mean_top_score": 0.7051958315100599
+  },
+  "top_label_reliability_bins": [
+    {
+      "bin": 0,
+      "lower": 0.0,
+      "upper": 0.1,
+      "count": 0,
+      "mean_score": null,
+      "observed_frequency": null
+    },
+    {
+      "bin": 1,
+      "lower": 0.1,
+      "upper": 0.2,
+      "count": 0,
+      "mean_score": null,
+      "observed_frequency": null
+    },
+    {
+      "bin": 2,
+      "lower": 0.2,
+      "upper": 0.30000000000000004,
+      "count": 0,
+      "mean_score": null,
+      "observed_frequency": null
+    },
+    {
+      "bin": 3,
+      "lower": 0.30000000000000004,
+      "upper": 0.4,
+      "count": 275,
+      "mean_score": 0.3773709404500526,
+      "observed_frequency": 0.6581818181818182
+    },
+    {
+      "bin": 4,
+      "lower": 0.4,
+      "upper": 0.5,
+      "count": 982,
+      "mean_score": 0.469451864679194,
+      "observed_frequency": 0.6089613034623218
+    },
+    {
+      "bin": 5,
+      "lower": 0.5,
+      "upper": 0.6000000000000001,
+      "count": 10210,
+      "mean_score": 0.5552428569581723,
+      "observed_frequency": 0.8730656219392752
+    },
+    {
+      "bin": 6,
+      "lower": 0.6000000000000001,
+      "upper": 0.7000000000000001,
+      "count": 9215,
+      "mean_score": 0.6477897764262043,
+      "observed_frequency": 0.9360824742268041
+    },
+    {
+      "bin": 7,
+      "lower": 0.7000000000000001,
+      "upper": 0.8,
+      "count": 10500,
+      "mean_score": 0.756848339114355,
+      "observed_frequency": 0.9673333333333334
+    },
+    {
+      "bin": 8,
+      "lower": 0.8,
+      "upper": 0.9,
+      "count": 12035,
+      "mean_score": 0.8413120125964214,
+      "observed_frequency": 0.9803074366431243
+    },
+    {
+      "bin": 9,
+      "lower": 0.9,
+      "upper": 1.0,
+      "count": 940,
+      "mean_score": 0.9191953198318259,
+      "observed_frequency": 0.9595744680851064
+    }
+  ],
+  "per_class": [
+    {
+      "class": "N",
+      "brier_score": 0.11349912082910728,
+      "expected_calibration_error": 0.22274224899125694,
+      "reliability_bins": [
+        {
+          "bin": 0,
+          "lower": 0.0,
+          "upper": 0.1,
+          "count": 165,
+          "mean_score": 0.04958806065463344,
+          "observed_frequency": 0.030303030303030304
+        },
+        {
+          "bin": 1,
+          "lower": 0.1,
+          "upper": 0.2,
+          "count": 225,
+          "mean_score": 0.15676781043086926,
+          "observed_frequency": 0.013333333333333334
+        },
+        {
+          "bin": 2,
+          "lower": 0.2,
+          "upper": 0.30000000000000004,
+          "count": 487,
+          "mean_score": 0.25357878554531416,
+          "observed_frequency": 0.018480492813141684
+        },
+        {
+          "bin": 3,
+          "lower": 0.30000000000000004,
+          "upper": 0.4,
+          "count": 1490,
+          "mean_score": 0.3578562952561061,
+          "observed_frequency": 0.1651006711409396
+        },
+        {
+          "bin": 4,
+          "lower": 0.4,
+          "upper": 0.5,
+          "count": 1915,
+          "mean_score": 0.4547104008386869,
+          "observed_frequency": 0.48198433420365533
+        },
+        {
+          "bin": 5,
+          "lower": 0.5,
+          "upper": 0.6000000000000001,
+          "count": 8756,
+          "mean_score": 0.556105699643953,
+          "observed_frequency": 0.9143444495203289
+        },
+        {
+          "bin": 6,
+          "lower": 0.6000000000000001,
+          "upper": 0.7000000000000001,
+          "count": 8279,
+          "mean_score": 0.6491387565906012,
+          "observed_frequency": 0.9391230824978862
+        },
+        {
+          "bin": 7,
+          "lower": 0.7000000000000001,
+          "upper": 0.8,
+          "count": 10132,
+          "mean_score": 0.7572333031051244,
+          "observed_frequency": 0.9673312277931306
+        },
+        {
+          "bin": 8,
+          "lower": 0.8,
+          "upper": 0.9,
+          "count": 11849,
+          "mean_score": 0.8412560980974227,
+          "observed_frequency": 0.9800827074014685
+        },
+        {
+          "bin": 9,
+          "lower": 0.9,
+          "upper": 1.0,
+          "count": 859,
+          "mean_score": 0.9172770945524867,
+          "observed_frequency": 0.9580908032596042
+        }
+      ],
+      "positive_support": 39204
+    },
+    {
+      "class": "S",
+      "brier_score": 0.039441599393411506,
+      "expected_calibration_error": 0.027766550900104905,
+      "reliability_bins": [
+        {
+          "bin": 0,
+          "lower": 0.0,
+          "upper": 0.1,
+          "count": 35036,
+          "mean_score": 0.03788469125758232,
+          "observed_frequency": 0.040329946340906496
+        },
+        {
+          "bin": 1,
+          "lower": 0.1,
+          "upper": 0.2,
+          "count": 7668,
+          "mean_score": 0.13784932168112007,
+          "observed_frequency": 0.008998435054773083
+        },
+        {
+          "bin": 2,
+          "lower": 0.2,
+          "upper": 0.30000000000000004,
+          "count": 1178,
+          "mean_score": 0.22849766060636473,
+          "observed_frequency": 0.11544991511035653
+        },
+        {
+          "bin": 3,
+          "lower": 0.30000000000000004,
+          "upper": 0.4,
+          "count": 275,
+          "mean_score": 0.33533377509621864,
+          "observed_frequency": 0.26545454545454544
+        },
+        {
+          "bin": 4,
+          "lower": 0.4,
+          "upper": 0.5,
+          "count": 0,
+          "mean_score": null,
+          "observed_frequency": null
+        },
+        {
+          "bin": 5,
+          "lower": 0.5,
+          "upper": 0.6000000000000001,
+          "count": 0,
+          "mean_score": null,
+          "observed_frequency": null
+        },
+        {
+          "bin": 6,
+          "lower": 0.6000000000000001,
+          "upper": 0.7000000000000001,
+          "count": 0,
+          "mean_score": null,
+          "observed_frequency": null
+        },
+        {
+          "bin": 7,
+          "lower": 0.7000000000000001,
+          "upper": 0.8,
+          "count": 0,
+          "mean_score": null,
+          "observed_frequency": null
+        },
+        {
+          "bin": 8,
+          "lower": 0.8,
+          "upper": 0.9,
+          "count": 0,
+          "mean_score": null,
+          "observed_frequency": null
+        },
+        {
+          "bin": 9,
+          "lower": 0.9,
+          "upper": 1.0,
+          "count": 0,
+          "mean_score": null,
+          "observed_frequency": null
+        }
+      ],
+      "positive_support": 1691
+    },
+    {
+      "class": "V",
+      "brier_score": 0.0728275079166878,
+      "expected_calibration_error": 0.20175905575941444,
+      "reliability_bins": [
+        {
+          "bin": 0,
+          "lower": 0.0,
+          "upper": 0.1,
+          "count": 9029,
+          "mean_score": 0.05781181421859081,
+          "observed_frequency": 0.0
+        },
+        {
+          "bin": 1,
+          "lower": 0.1,
+          "upper": 0.2,
+          "count": 11802,
+          "mean_score": 0.14716485062272305,
+          "observed_frequency": 0.0003389256058295204
+        },
+        {
+          "bin": 2,
+          "lower": 0.2,
+          "upper": 0.30000000000000004,
+          "count": 9015,
+          "mean_score": 0.24825361564503062,
+          "observed_frequency": 0.0006655574043261231
+        },
+        {
+          "bin": 3,
+          "lower": 0.30000000000000004,
+          "upper": 0.4,
+          "count": 5794,
+          "mean_score": 0.3475036760475027,
+          "observed_frequency": 0.006558508802209182
+        },
+        {
+          "bin": 4,
+          "lower": 0.4,
+          "upper": 0.5,
+          "count": 5492,
+          "mean_score": 0.44239066026895973,
+          "observed_frequency": 0.08357611070648216
+        },
+        {
+          "bin": 5,
+          "lower": 0.5,
+          "upper": 0.6000000000000001,
+          "count": 1454,
+          "mean_score": 0.5500468111832785,
+          "observed_frequency": 0.624484181568088
+        },
+        {
+          "bin": 6,
+          "lower": 0.6000000000000001,
+          "upper": 0.7000000000000001,
+          "count": 936,
+          "mean_score": 0.635857931574662,
+          "observed_frequency": 0.9091880341880342
+        },
+        {
+          "bin": 7,
+          "lower": 0.7000000000000001,
+          "upper": 0.8,
+          "count": 368,
+          "mean_score": 0.746249276194586,
+          "observed_frequency": 0.967391304347826
+        },
+        {
+          "bin": 8,
+          "lower": 0.8,
+          "upper": 0.9,
+          "count": 186,
+          "mean_score": 0.8448740066751124,
+          "observed_frequency": 0.9946236559139785
+        },
+        {
+          "bin": 9,
+          "lower": 0.9,
+          "upper": 1.0,
+          "count": 81,
+          "mean_score": 0.9395379805102498,
+          "observed_frequency": 0.9753086419753086
+        }
+      ],
+      "positive_support": 2886
+    },
+    {
+      "class": "F",
+      "brier_score": 0.00926809385151169,
+      "expected_calibration_error": 0.009105165868633965,
+      "reliability_bins": [
+        {
+          "bin": 0,
+          "lower": 0.0,
+          "upper": 0.1,
+          "count": 43100,
+          "mean_score": 0.003431621770004031,
+          "observed_frequency": 0.00863109048723898
+        },
+        {
+          "bin": 1,
+          "lower": 0.1,
+          "upper": 0.2,
+          "count": 809,
+          "mean_score": 0.14218815820927752,
+          "observed_frequency": 0.0
+        },
+        {
+          "bin": 2,
+          "lower": 0.2,
+          "upper": 0.30000000000000004,
+          "count": 213,
+          "mean_score": 0.23752970950656524,
+          "observed_frequency": 0.0
+        },
+        {
+          "bin": 3,
+          "lower": 0.30000000000000004,
+          "upper": 0.4,
+          "count": 30,
+          "mean_score": 0.3383806617568101,
+          "observed_frequency": 0.0
+        },
+        {
+          "bin": 4,
+          "lower": 0.4,
+          "upper": 0.5,
+          "count": 5,
+          "mean_score": 0.43684791590710664,
+          "observed_frequency": 0.0
+        },
+        {
+          "bin": 5,
+          "lower": 0.5,
+          "upper": 0.6000000000000001,
+          "count": 0,
+          "mean_score": null,
+          "observed_frequency": null
+        },
+        {
+          "bin": 6,
+          "lower": 0.6000000000000001,
+          "upper": 0.7000000000000001,
+          "count": 0,
+          "mean_score": null,
+          "observed_frequency": null
+        },
+        {
+          "bin": 7,
+          "lower": 0.7000000000000001,
+          "upper": 0.8,
+          "count": 0,
+          "mean_score": null,
+          "observed_frequency": null
+        },
+        {
+          "bin": 8,
+          "lower": 0.8,
+          "upper": 0.9,
+          "count": 0,
+          "mean_score": null,
+          "observed_frequency": null
+        },
+        {
+          "bin": 9,
+          "lower": 0.9,
+          "upper": 1.0,
+          "count": 0,
+          "mean_score": null,
+          "observed_frequency": null
+        }
+      ],
+      "positive_support": 372
+    },
+    {
+      "class": "Q",
+      "brier_score": 9.058686055827669e-05,
+      "expected_calibration_error": 8.96440727947952e-05,
+      "reliability_bins": [
+        {
+          "bin": 0,
+          "lower": 0.0,
+          "upper": 0.1,
+          "count": 44157,
+          "mean_score": 9.417912811157471e-07,
+          "observed_frequency": 9.058586407591095e-05
+        },
+        {
+          "bin": 1,
+          "lower": 0.1,
+          "upper": 0.2,
+          "count": 0,
+          "mean_score": null,
+          "observed_frequency": null
+        },
+        {
+          "bin": 2,
+          "lower": 0.2,
+          "upper": 0.30000000000000004,
+          "count": 0,
+          "mean_score": null,
+          "observed_frequency": null
+        },
+        {
+          "bin": 3,
+          "lower": 0.30000000000000004,
+          "upper": 0.4,
+          "count": 0,
+          "mean_score": null,
+          "observed_frequency": null
+        },
+        {
+          "bin": 4,
+          "lower": 0.4,
+          "upper": 0.5,
+          "count": 0,
+          "mean_score": null,
+          "observed_frequency": null
+        },
+        {
+          "bin": 5,
+          "lower": 0.5,
+          "upper": 0.6000000000000001,
+          "count": 0,
+          "mean_score": null,
+          "observed_frequency": null
+        },
+        {
+          "bin": 6,
+          "lower": 0.6000000000000001,
+          "upper": 0.7000000000000001,
+          "count": 0,
+          "mean_score": null,
+          "observed_frequency": null
+        },
+        {
+          "bin": 7,
+          "lower": 0.7000000000000001,
+          "upper": 0.8,
+          "count": 0,
+          "mean_score": null,
+          "observed_frequency": null
+        },
+        {
+          "bin": 8,
+          "lower": 0.8,
+          "upper": 0.9,
+          "count": 0,
+          "mean_score": null,
+          "observed_frequency": null
+        },
+        {
+          "bin": 9,
+          "lower": 0.9,
+          "upper": 1.0,
+          "count": 0,
+          "mean_score": null,
+          "observed_frequency": null
+        }
+      ],
+      "positive_support": 4
+    }
+  ],
+  "calibration_status": "held_out_reliability_diagnostics_only",
+  "interpretation": "These diagnostics evaluate the supplied score vectors on untouched held-out labels; no transform is fitted here. When available, the upstream temperature was fitted only from grouped out-of-fold training records. Internal calibration is not external or clinical validation, and score semantics remain model-specific."
+}

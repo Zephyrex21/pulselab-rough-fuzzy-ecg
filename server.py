@@ -25,7 +25,7 @@ from starlette.concurrency import run_in_threadpool
 from pydantic import BaseModel, Field
 
 import config
-from modules import data_loader, dataset_audit, inference, pipeline, validation
+from modules import data_loader, dataset_audit, inference, pipeline, validation, bidmc_pipeline
 
 ROOT = Path(__file__).resolve().parent
 WEB_DIR = ROOT / "web"
@@ -38,7 +38,7 @@ app = FastAPI(
         "Local API for dataset QA, R-peak validation, reproducible MIT-BIH "
         "Rough-Fuzzy experiments, and saved-model ECG inference. Research use only; not a medical device."
     ),
-    version="0.6.1",
+    version="0.7.0",
     docs_url="/api/docs",
     redoc_url=None,
     openapi_url="/api/openapi.json",
@@ -73,6 +73,12 @@ class ExperimentRequest(BaseModel):
     include_baselines: bool = True
     save_models: bool = True
     run_name: str | None = Field(default=None, min_length=1, max_length=80, pattern=r"^[A-Za-z0-9_.-]+$")
+
+
+class BIDMCFeatureExportRequest(BaseModel):
+    records: list[str] = Field(default_factory=list)
+    window_sec: float = Field(default=32.0, ge=16.0, le=120.0)
+    stride_sec: float = Field(default=16.0, ge=4.0, le=120.0)
 
 
 def _split_records(protocol: str, quick: bool) -> tuple[list[str], list[str]]:
@@ -328,6 +334,86 @@ def _read_experiment_summary(run_dir: Path) -> dict:
     })
 
 
+def _run_bidmc_feature_export(job_id: str, request: BIDMCFeatureExportRequest, progress) -> dict:
+    """Extract windowed multimodal BIDMC features and persist training-ready tables."""
+    progress(0.03, "Locating BIDMC CSV dataset")
+    full, rr_safe = bidmc_pipeline.build_feature_dataset(
+        config.BIDMC_DATA_DIR,
+        record_ids=request.records or None,
+        window_sec=request.window_sec,
+        stride_sec=request.stride_sec,
+        progress=lambda fraction, message: progress(0.05 + 0.82 * fraction, message),
+    )
+    export_id = "bidmc_features_" + datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ") + "_" + uuid4().hex[:6]
+    output_dir = (EXPERIMENTS_DIR / "bidmc_feature_exports" / export_id).resolve()
+    output_dir.mkdir(parents=True, exist_ok=True)
+    full_path = output_dir / "features_full_multimodal.csv"
+    safe_path = output_dir / "features_rr_estimation_no_resp_input.csv"
+    full.to_csv(full_path, index=False)
+    rr_safe.to_csv(safe_path, index=False)
+    patient_ids = sorted(full["patient_id"].dropna().astype(str).unique().tolist()) if not full.empty else []
+    summary = {
+        "export_id": export_id,
+        "dataset": "BIDMC PPG and Respiration Dataset",
+        "records": sorted(full["record_id"].dropna().astype(str).unique().tolist()) if not full.empty else [],
+        "n_records": int(full["record_id"].nunique()) if not full.empty else 0,
+        "n_patient_groups": len(patient_ids),
+        "patient_ids": patient_ids,
+        "window_sec": request.window_sec,
+        "stride_sec": request.stride_sec,
+        "n_windows": int(len(full)),
+        "n_labelled_windows": int(full["ref_rr_mean_bpm"].notna().sum()) if not full.empty else 0,
+        "n_features_full_multimodal": int(len([c for c in full.columns if c not in {"record_id", "patient_id", "window_start_sec", "window_end_sec", "ref_rr_ann1_bpm", "ref_rr_ann2_bpm", "ref_rr_mean_bpm", "annotator_difference_bpm", "ann1_breath_count", "ann2_breath_count", "window_quality"}])),
+        "n_features_rr_estimation": int(len([c for c in rr_safe.columns if c not in {"record_id", "patient_id", "window_start_sec", "window_end_sec", "ref_rr_ann1_bpm", "ref_rr_ann2_bpm", "ref_rr_mean_bpm", "annotator_difference_bpm", "ann1_breath_count", "ann2_breath_count", "window_quality"}])),
+        "files": [full_path.name, safe_path.name],
+        "target_definition": "Median interval-based breaths/min independently derived from ann1 and ann2; ref_rr_mean_bpm is the mean of available annotator rates.",
+        "leakage_control": "The RR-estimation table excludes RESP-derived predictors and ECG/PPG-to-RESP correlations. Keep RESP as reference/auxiliary input for descriptive full-fusion analysis, not as a predictor when predicting a target derived from RESP annotations.",
+        "patient_grouping": "Patient IDs are parsed from MIMIC-II source identifiers in WFDB headers when available; otherwise a record-level group is used and flagged by its bidmc_record_ prefix.",
+        "model_status": "No BIDMC model is trained by this export. Train and evaluate later using patient-grouped splits.",
+    }
+    (output_dir / "feature_export_summary.json").write_text(json.dumps(_json_safe(summary), indent=2), encoding="utf-8")
+    progress(0.95, "Writing export metadata")
+    return summary
+
+
+@app.get("/api/bidmc/status")
+def bidmc_status():
+    """Inspect local BIDMC dataset availability without running inference."""
+    return _json_safe(bidmc_pipeline.inventory(config.BIDMC_DATA_DIR))
+
+
+@app.get("/api/bidmc/records/{record_id}/preview")
+def bidmc_record_preview(record_id: str, start_sec: float = 0.0, duration_sec: float = 20.0):
+    try:
+        record = bidmc_pipeline.load_record(record_id, config.BIDMC_DATA_DIR)
+        return _json_safe(bidmc_pipeline.extract_preview(record, start_sec, duration_sec))
+    except bidmc_pipeline.BIDMCError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.post("/api/bidmc/feature-exports", status_code=202)
+def create_bidmc_feature_export(request: BIDMCFeatureExportRequest, background_tasks: BackgroundTasks):
+    if request.stride_sec > request.window_sec:
+        raise HTTPException(status_code=422, detail="Stride cannot exceed the selected window length.")
+    params = request.model_dump()
+    job_id = _create_job("bidmc_feature_export", params)
+    background_tasks.add_task(_run_job, job_id, lambda progress: _run_bidmc_feature_export(job_id, request, progress))
+    return {"job_id": job_id, "status": "queued", "poll_url": f"/api/jobs/{job_id}"}
+
+
+@app.get("/api/bidmc/feature-exports/{export_id}/files/{filename}")
+def download_bidmc_feature_export(export_id: str, filename: str):
+    if not _RUN_ID_RE.fullmatch(export_id) or Path(filename).name != filename:
+        raise HTTPException(status_code=400, detail="Invalid BIDMC export path.")
+    if filename not in {"features_full_multimodal.csv", "features_rr_estimation_no_resp_input.csv", "feature_export_summary.json"}:
+        raise HTTPException(status_code=404, detail="BIDMC export file not found.")
+    root = (EXPERIMENTS_DIR / "bidmc_feature_exports").resolve()
+    path = (root / export_id / filename).resolve()
+    if path.parent != (root / export_id).resolve() or not path.is_file():
+        raise HTTPException(status_code=404, detail="BIDMC export file not found.")
+    return FileResponse(path, filename=filename)
+
+
 @app.get("/", include_in_schema=False)
 def home():
     return RedirectResponse(url="/web/")
@@ -346,6 +432,7 @@ def health():
         "dependencies": deps,
         "wfdb_ready": deps["wfdb"],
         "dataset_records_available": len(available),
+        "bidmc_records_available": bidmc_pipeline.inventory(config.BIDMC_DATA_DIR)["records_found"],
         "saved_inference_models": len(inference.discover_saved_models(EXPERIMENTS_DIR, config.ROOT, config.MODELS_DIR)),
         "inference_upload_ready": all(deps[key] for key in ("numpy", "pandas", "scipy", "scikit_learn", "pywavelets", "python_multipart")),
         "dataset_root": str(config.DATA_DIR),

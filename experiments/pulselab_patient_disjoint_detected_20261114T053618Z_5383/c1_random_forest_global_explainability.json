@@ -1,0 +1,197 @@
+{
+  "available": true,
+  "method": "random forest impurity-based feature importance",
+  "features": [
+    {
+      "feature": "rr_prev",
+      "importance": 0.07833448239929386
+    },
+    {
+      "feature": "c1_r_amp",
+      "importance": 0.06828079885118046
+    },
+    {
+      "feature": "c0_skewness",
+      "importance": 0.05084692577680186
+    },
+    {
+      "feature": "c0_r_amp",
+      "importance": 0.04535217626890678
+    },
+    {
+      "feature": "rr_ratio_prev",
+      "importance": 0.042920203831215115
+    },
+    {
+      "feature": "rr_std",
+      "importance": 0.03578373774314069
+    },
+    {
+      "feature": "c0_kurtosis",
+      "importance": 0.03231193608727827
+    },
+    {
+      "feature": "rr_mean",
+      "importance": 0.030023207324749224
+    },
+    {
+      "feature": "c0_psd_0p5_5",
+      "importance": 0.02863980803799763
+    },
+    {
+      "feature": "c0_wav_d3",
+      "importance": 0.02649186654753839
+    },
+    {
+      "feature": "c0_wav_d2",
+      "importance": 0.02526525551687321
+    },
+    {
+      "feature": "c0_qrs_dur",
+      "importance": 0.025257684150584596
+    },
+    {
+      "feature": "c1_variance",
+      "importance": 0.02454664231832235
+    },
+    {
+      "feature": "heart_rate",
+      "importance": 0.023113870375097097
+    },
+    {
+      "feature": "c0_t_wave_amp",
+      "importance": 0.02280953980738308
+    },
+    {
+      "feature": "c0_spec_entropy",
+      "importance": 0.022073467549242783
+    },
+    {
+      "feature": "c0_mean_pre_r",
+      "importance": 0.02184340219093216
+    },
+    {
+      "feature": "c1_energy",
+      "importance": 0.021124354030923824
+    },
+    {
+      "feature": "c0_mean_post_r",
+      "importance": 0.01977008953794056
+    },
+    {
+      "feature": "c1_area",
+      "importance": 0.01965423877798423
+    },
+    {
+      "feature": "c1_ptp",
+      "importance": 0.018954109529346556
+    },
+    {
+      "feature": "rr_next",
+      "importance": 0.018402833675598588
+    },
+    {
+      "feature": "c1_qrs_dur",
+      "importance": 0.017217207071782113
+    },
+    {
+      "feature": "c0_psd_15_40",
+      "importance": 0.015925702550751288
+    },
+    {
+      "feature": "c1_psd_0p5_5",
+      "importance": 0.01578778387806071
+    },
+    {
+      "feature": "c0_psd_5_15",
+      "importance": 0.015357230205192085
+    },
+    {
+      "feature": "c1_mean_pre_r",
+      "importance": 0.014435180197365375
+    },
+    {
+      "feature": "c0_ptp",
+      "importance": 0.014409417897741401
+    },
+    {
+      "feature": "c0_energy",
+      "importance": 0.014277612560773386
+    },
+    {
+      "feature": "c0_wav_d4",
+      "importance": 0.014277552106307063
+    },
+    {
+      "feature": "c1_mean_post_r",
+      "importance": 0.014139633982112054
+    },
+    {
+      "feature": "rr_ratio_next",
+      "importance": 0.013953513584585107
+    },
+    {
+      "feature": "c0_wav_a4",
+      "importance": 0.013311645140303275
+    },
+    {
+      "feature": "c1_t_wave_amp",
+      "importance": 0.012674587222654937
+    },
+    {
+      "feature": "c0_variance",
+      "importance": 0.012489430219402273
+    },
+    {
+      "feature": "c0_area",
+      "importance": 0.011966130672283337
+    },
+    {
+      "feature": "c1_skewness",
+      "importance": 0.011950672122132269
+    },
+    {
+      "feature": "c1_wav_a4",
+      "importance": 0.011510518952906503
+    },
+    {
+      "feature": "c1_wav_d4",
+      "importance": 0.01141564196799742
+    },
+    {
+      "feature": "c1_kurtosis",
+      "importance": 0.010853946958622906
+    },
+    {
+      "feature": "c1_wav_d2",
+      "importance": 0.010713326049966327
+    },
+    {
+      "feature": "c1_spec_entropy",
+      "importance": 0.00951427857631959
+    },
+    {
+      "feature": "c0_dom_freq",
+      "importance": 0.008148767821403955
+    },
+    {
+      "feature": "c1_psd_15_40",
+      "importance": 0.007429565695636037
+    },
+    {
+      "feature": "c1_psd_5_15",
+      "importance": 0.00730575242267288
+    },
+    {
+      "feature": "c1_wav_d3",
+      "importance": 0.005398121918892476
+    },
+    {
+      "feature": "c1_dom_freq",
+      "importance": 0.003736149895804094
+    }
+  ],
+  "limitations": [
+    "Impurity-based importance can favour variables with many split opportunities and is not a causal effect."
+  ]
+}

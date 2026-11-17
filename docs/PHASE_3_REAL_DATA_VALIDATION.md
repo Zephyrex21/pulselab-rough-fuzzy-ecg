@@ -1,3 +1,5 @@
+> **Historical implementation note:** This document records an earlier development phase. The synthetic browser ECG demonstration described here was removed in PulseLab 0.7.0; the current browser only calls the real Python research APIs.
+
 # Phase 3 — Real MIT-BIH validation and reproducible experiments
 
 **Release:** PulseLab 0.3.0  
@@ -110,7 +112,7 @@ Run automated tests:
 
 ```powershell
 py -m pytest -q
-node tests/browser_core_smoke.test.js
+node --check web/app.js
 ```
 
 ## Output files

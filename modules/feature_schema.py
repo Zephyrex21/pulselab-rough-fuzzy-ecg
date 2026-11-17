@@ -1,7 +1,8 @@
 """Canonical Python feature schema for PulseLab's MIT-BIH research pipeline.
 
-The browser demo intentionally retains its separate synthetic 25-feature schema;
-this module is the source of truth for the real-data Python pipeline.
+This schema is specific to MIT-BIH ECG beat classification. The BIDMC
+multimodal pipeline has its own window-level feature schema in
+``modules.bidmc_pipeline``. The browser is an API client and owns no model schema.
 """
 from __future__ import annotations
 

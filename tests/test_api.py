@@ -100,16 +100,19 @@ def test_api_docs_and_artifact_allowlist_are_available():
     assert bad_artifact.status_code == 404
 
 
-def test_frontend_exposes_research_backend_and_api_boundary():
+def test_frontend_exposes_two_real_research_engines_without_browser_simulator():
     root = server.WEB_DIR
     index = (root / "index.html").read_text(encoding="utf-8")
     script = (root / "app.js").read_text(encoding="utf-8")
     assert 'id="environment-chip"' in index
-    assert "backend:{label:'Research Backend'" in script
-    assert "const API_BASE='/api'" in script
-    assert "synthetic browser demonstration" in script
-    assert "Selected heartbeat waveform" in script
-    assert "/waveform" in script
+    assert 'src="app.js"' in index
+    assert 'src="core.js"' not in index
+    assert "MIT-BIH ECG Engine" in script
+    assert "BIDMC Multimodal Engine" in script
+    assert "/bidmc/status" in script
+    assert "/bidmc/feature-exports" in script
+    assert "sample(" not in script
+    assert not (root / "core.js").exists()
 
 
 def test_saved_experiment_summary_and_artifact_download(tmp_path, monkeypatch):
@@ -290,15 +293,13 @@ def test_phase5_full_multipart_inference_round_trip(tmp_path, monkeypatch):
     assert "predicted_class" in predictions_artifact.text
 
 
-def test_frontend_exposes_phase5_model_inference_workspace():
+def test_frontend_includes_saved_python_mitbih_inference():
     index = (server.WEB_DIR / "index.html").read_text(encoding="utf-8")
     script = (server.WEB_DIR / "app.js").read_text(encoding="utf-8")
-    styles = (server.WEB_DIR / "styles.css").read_text(encoding="utf-8")
-    assert 'data-k="inference"' in script or "inference:{label:'Model Inference'" in script
-    assert "Run Python model inference" in script
-    assert "inferences/" in script
-    assert "inference-class-distribution" in styles
-    assert "Model Inference" in index or "PulseLab" in index
+    assert "Saved-model ECG inference" in script
+    assert "Run Python ECG inference" in script
+    assert "'/inference'" in script or "'/api/inference'" in script or "request('/inference'" in script
+    assert "PulseLab" in index
 
 
 def test_phase6_inference_drift_artifacts_are_allowlisted(tmp_path, monkeypatch):
@@ -315,13 +316,11 @@ def test_phase6_inference_drift_artifacts_are_allowlisted(tmp_path, monkeypatch)
     assert denied.status_code in (400, 404)
 
 
-def test_phase6_frontend_exposes_local_explainability_and_score_diagnostics():
-    script = (server.WEB_DIR / "app.js").read_text(encoding="utf-8")
-    styles = (server.WEB_DIR / "styles.css").read_text(encoding="utf-8")
-    assert "Local feature sensitivity" in script
-    assert "Training-range drift check" in script
-    assert "Held-out score reliability diagnostics" in script
-    assert "explainability-track" in styles
+def test_phase6_backend_explainability_endpoints_remain_available():
+    paths = {route.path for route in server.app.routes}
+    assert "/api/inferences/{inference_id}/beats/{beat_index}/explanation" in paths
+    assert "/api/inferences/{inference_id}/beats/{beat_index}/waveform" in paths
+    assert "/api/inferences/{inference_id}/artifacts/{artifact_name}" in paths
 
 
 def test_phase6_beat_waveform_preview_endpoint(monkeypatch):
@@ -351,3 +350,34 @@ def test_phase6_waveform_endpoint_returns_gone_when_preview_was_evicted(monkeypa
         response = client.get("/api/inferences/inference_fixture_1234/beats/0/waveform")
     assert response.status_code == 410
     assert "evicted" in response.json()["detail"]
+
+
+def test_bidmc_status_endpoint_reports_missing_local_dataset(tmp_path, monkeypatch):
+    monkeypatch.setattr(config, "BIDMC_DATA_DIR", tmp_path / "bidmc")
+    with TestClient(server.app) as client:
+        response = client.get("/api/bidmc/status")
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["dataset"] == "BIDMC PPG and Respiration Dataset"
+    assert payload["records_expected"] == 53
+    assert payload["ready"] is False
+
+
+def test_bidmc_feature_export_requires_a_dataset(tmp_path, monkeypatch):
+    monkeypatch.setattr(config, "BIDMC_DATA_DIR", tmp_path / "bidmc")
+    monkeypatch.setattr(server, "EXPERIMENTS_DIR", tmp_path / "experiments")
+    server._JOBS.clear()
+    with TestClient(server.app) as client:
+        created = client.post("/api/bidmc/feature-exports", json={"records": ["bidmc01"]})
+        assert created.status_code == 202
+        job = client.get(f"/api/jobs/{created.json()['job_id']}").json()
+    assert job["status"] == "failed"
+    assert "BIDMC CSV files were not found" in job["error"]
+
+
+def test_bidmc_preview_rejects_missing_record(tmp_path, monkeypatch):
+    monkeypatch.setattr(config, "BIDMC_DATA_DIR", tmp_path / "bidmc")
+    with TestClient(server.app) as client:
+        response = client.get("/api/bidmc/records/bidmc01/preview")
+    assert response.status_code == 400
+    assert "BIDMC dataset not found" in response.json()["detail"]

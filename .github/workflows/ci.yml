@@ -50,8 +50,8 @@ jobs:
       - name: Run Python test suite
         run: python -m pytest -q
 
-  browser-smoke-tests:
-    name: Browser JavaScript checks
+  frontend-checks:
+    name: Frontend JavaScript checks
     runs-on: ubuntu-latest
 
     steps:
@@ -68,7 +68,6 @@ jobs:
       - name: Check JavaScript syntax
         run: |
           node --check web/app.js
-          node --check web/core.js
 
-      - name: Run browser-core smoke test
-        run: node tests/browser_core_smoke.test.js
+      - name: Verify removed simulator is not loaded
+        run: '! grep -Eq "core\.js|SIMULATED DATA|synthetic browser" web/index.html web/app.js'

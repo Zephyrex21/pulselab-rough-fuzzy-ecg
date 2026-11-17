@@ -5,9 +5,10 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
 DATA_DIR = ROOT / "data" / "mitdb"
+BIDMC_DATA_DIR = ROOT / "data" / "bidmc"
 MODELS_DIR = ROOT / "models"
 EXPERIMENTS_DIR = ROOT / "experiments"
-for _d in (DATA_DIR, MODELS_DIR, EXPERIMENTS_DIR):
+for _d in (DATA_DIR, BIDMC_DATA_DIR, MODELS_DIR, EXPERIMENTS_DIR):
     _d.mkdir(parents=True, exist_ok=True)
 
 SEED = 42

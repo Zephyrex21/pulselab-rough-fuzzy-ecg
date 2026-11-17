@@ -1,3 +1,5 @@
+> **Historical implementation note:** This document records an earlier development phase. The synthetic browser ECG demonstration described here was removed in PulseLab 0.7.0; the current browser only calls the real Python research APIs.
+
 # Phase 4 — Unified browser and Python research API
 
 **Release:** PulseLab 0.4.0  
@@ -81,7 +83,7 @@ Automated tests cover service health, selected split metadata, static frontend s
 ```powershell
 py -m pytest -q
 node --check web/app.js
-node tests/browser_core_smoke.test.js
+node --check web/app.js
 ```
 
 These checks verify code paths and the integration contract. They do not establish real MIT-BIH performance; run the dataset audit and experiments locally to generate those results.

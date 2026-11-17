@@ -1,0 +1,6 @@
+{
+  "available": false,
+  "method": "not available",
+  "message": "This model has no native global feature-importance measure. Use per-beat reference ablation for a local sensitivity view.",
+  "features": []
+}

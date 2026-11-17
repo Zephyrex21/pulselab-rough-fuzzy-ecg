@@ -103,7 +103,7 @@ with tabs[0]:
             "- Automatic detector validation reported separately\n- Record-cluster confidence intervals\n"
             "- No clinical probability or diagnostic claims"
         )
-    st.caption("Browser simulation remains separate from the real-data Python research engine.")
+    st.caption("The browser interface and this console both call the real-data Python research engines; no synthetic browser ECG model is used.")
 
 with tabs[1]:
     st.subheader("Dataset quality and provenance")

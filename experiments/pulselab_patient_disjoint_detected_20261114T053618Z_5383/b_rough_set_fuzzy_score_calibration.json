@@ -1,0 +1,24 @@
+{
+  "method": "out-of-fold patient/record-grouped scalar temperature scaling",
+  "status": "fitted",
+  "temperature": 0.26464831299340974,
+  "n_oof_samples": 44288,
+  "n_record_groups": 22,
+  "n_splits": 3,
+  "calibration_scope": "training records only; held-out test records are not used to fit temperature",
+  "oof_imputation": "fold-specific medians fitted only on each fold's training records",
+  "oof_log_loss_after_scaling": 0.605887675841124,
+  "oof_log_loss_before_scaling": 0.8597426516804766,
+  "class_support": {
+    "N": 40915,
+    "S": 845,
+    "V": 2122,
+    "F": 403,
+    "Q": 3
+  },
+  "limitations": [
+    "Temperature was fitted to grouped out-of-fold training scores and then applied to the final model fit on all training records.",
+    "Held-out test reliability must still be inspected; this is internal calibration, not external or clinical validation.",
+    "Calibration can be unstable when a class is represented by only a few training records or beats."
+  ]
+}

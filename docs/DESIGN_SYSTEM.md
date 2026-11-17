@@ -6,7 +6,7 @@ PulseLab uses an Apple-inspired research-product aesthetic: calm surfaces, restr
 
 ## Appearance modes
 
-The application supports `light` and `dark` themes through the root `data-theme` attribute. The selected theme is saved in browser storage under `pulselab-theme` and restored on the next visit. Theme variables are centralised in `web/styles.css` so future pages can use the same semantic tokens.
+The application supports `light` and `dark` themes through the root `data-theme` attribute. The selected theme is saved in browser storage under `pulselab-theme` and restored on the next visit. Theme variables are centralised in `web/styles.css`.
 
 ## Semantic tokens
 
@@ -29,14 +29,14 @@ The application supports `light` and `dark` themes through the root `data-theme`
 
 ## Components
 
-- **Sidebar:** persistent product identity, workspace navigation, research-mode disclosure and local-session indicator.
-- **Top bar:** current location, synthetic-data status and appearance control.
-- **Page introduction:** section eyebrow, clear title, descriptive summary and browser-analysis status.
+- **Sidebar:** product identity, the two research engines, navigation and local-session status.
+- **Top bar:** current location, active research pipeline and appearance control.
+- **Page introduction:** section eyebrow, clear title, descriptive summary and live API/dataset status.
 - **Cards:** consistent surface, radius, border and restrained elevation.
 - **KPI tiles:** tabular values, compact labels and muted secondary surfaces.
 - **Controls:** visible focus treatment, clear active state and comfortable pointer targets.
 - **Tables:** sticky, quiet headers; readable row spacing; horizontal overflow on narrow screens.
-- **Status labels:** explicit synthetic/research/non-clinical context.
+- **Status labels:** distinguish saved experiment outputs, raw dataset availability, feature exports and models awaiting training.
 
 ## Interaction and accessibility principles
 
@@ -47,11 +47,12 @@ The application supports `light` and `dark` themes through the root `data-theme`
 - Keyboard focus is visible.
 - Layouts collapse for tablet and phone widths without removing essential controls.
 - Colour is not the only way to communicate model labels; labels remain visible in result tables.
+- The browser only renders data returned by the Python API; it does not generate ECG signals or train classifiers locally.
 
 ## ECG class colours
 
-The existing class palette is retained for continuity: N green, S blue, V red, F amber, Q violet. These are data-visualisation accents, not clinical severity indicators.
+The MIT-BIH AAMI class palette is retained for continuity: N green, S blue, V red, F amber, Q violet. These are data-visualisation accents, not clinical severity indicators.
 
 ## Product-language guidance
 
-Use “synthetic benchmark”, “experimental prediction”, and “research prototype”. Do not describe browser metrics as MIT-BIH results, clinical accuracy, diagnosis, or validated performance. Clearly state that user-uploaded signals are analysed by the current demonstration model and do not update its training set.
+Describe PulseLab as an academic research prototype. Clearly distinguish the MIT-BIH AAMI arrhythmia-classification engine from the BIDMC multimodal respiratory-rate research engine. Never present training-pending BIDMC output as a prediction. Avoid diagnosis, clinical accuracy or validated-performance claims.

@@ -1,0 +1,157 @@
+{
+  "available": true,
+  "method": "normalised fuzzy-rule antecedent weight \u00d7 support",
+  "features": [
+    {
+      "feature": "rr_prev",
+      "importance": 0.09467737664556844
+    },
+    {
+      "feature": "c0_r_amp",
+      "importance": 0.08415315454467084
+    },
+    {
+      "feature": "c1_r_amp",
+      "importance": 0.07596265677064866
+    },
+    {
+      "feature": "c0_kurtosis",
+      "importance": 0.06636315703702877
+    },
+    {
+      "feature": "c1_dom_freq",
+      "importance": 0.06484178637735827
+    },
+    {
+      "feature": "c0_qrs_dur",
+      "importance": 0.053094311264338896
+    },
+    {
+      "feature": "c1_mean_pre_r",
+      "importance": 0.051430868713284346
+    },
+    {
+      "feature": "rr_ratio_prev",
+      "importance": 0.043198323156472776
+    },
+    {
+      "feature": "rr_std",
+      "importance": 0.042348399311784135
+    },
+    {
+      "feature": "c0_dom_freq",
+      "importance": 0.03978717189839454
+    },
+    {
+      "feature": "c0_skewness",
+      "importance": 0.03671030695908191
+    },
+    {
+      "feature": "c1_area",
+      "importance": 0.03633807252434875
+    },
+    {
+      "feature": "c0_psd_0p5_5",
+      "importance": 0.03319990154099264
+    },
+    {
+      "feature": "c0_mean_pre_r",
+      "importance": 0.027732867578804152
+    },
+    {
+      "feature": "c0_wav_a4",
+      "importance": 0.021767785898794013
+    },
+    {
+      "feature": "rr_ratio_next",
+      "importance": 0.021215891728137763
+    },
+    {
+      "feature": "rr_mean",
+      "importance": 0.020002471042979197
+    },
+    {
+      "feature": "c1_mean_post_r",
+      "importance": 0.01923798418715622
+    },
+    {
+      "feature": "c0_energy",
+      "importance": 0.01892241300029588
+    },
+    {
+      "feature": "c0_spec_entropy",
+      "importance": 0.018809232065321625
+    },
+    {
+      "feature": "c1_psd_0p5_5",
+      "importance": 0.01851594724671577
+    },
+    {
+      "feature": "c1_variance",
+      "importance": 0.016169635649034578
+    },
+    {
+      "feature": "c0_psd_5_15",
+      "importance": 0.014781790465971409
+    },
+    {
+      "feature": "c1_t_wave_amp",
+      "importance": 0.012985484277308163
+    },
+    {
+      "feature": "c1_psd_5_15",
+      "importance": 0.012095684927195918
+    },
+    {
+      "feature": "rr_next",
+      "importance": 0.008585080459282005
+    },
+    {
+      "feature": "c1_wav_d4",
+      "importance": 0.006633614197631136
+    },
+    {
+      "feature": "c1_wav_d2",
+      "importance": 0.005883282804818501
+    },
+    {
+      "feature": "c1_wav_d3",
+      "importance": 0.0055906602898054235
+    },
+    {
+      "feature": "c1_spec_entropy",
+      "importance": 0.004662463840224949
+    },
+    {
+      "feature": "c0_mean_post_r",
+      "importance": 0.004550075875852092
+    },
+    {
+      "feature": "c1_qrs_dur",
+      "importance": 0.004201614863023303
+    },
+    {
+      "feature": "c1_psd_15_40",
+      "importance": 0.004160375052082598
+    },
+    {
+      "feature": "c0_wav_d4",
+      "importance": 0.0035445168510406227
+    },
+    {
+      "feature": "c0_ptp",
+      "importance": 0.0035283914800470486
+    },
+    {
+      "feature": "c0_t_wave_amp",
+      "importance": 0.002158624737252297
+    },
+    {
+      "feature": "c0_psd_15_40",
+      "importance": 0.002158624737252297
+    }
+  ],
+  "limitations": [
+    "This aggregates rule usage, not causal importance or held-out permutation importance."
+  ]
+}

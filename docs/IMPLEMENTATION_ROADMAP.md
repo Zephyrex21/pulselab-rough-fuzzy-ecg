@@ -4,71 +4,63 @@
 
 **Status: Implemented.**
 
-- PulseLab branding and Apple-inspired responsive navigation.
+- PulseLab branding and responsive navigation.
 - Persistent light/dark themes.
-- Design tokens, architecture notes and browser demo safeguards.
+- Design tokens, architecture notes and research-prototype safeguards.
 
-## Phase 2 — Research engine completion
+## Phase 2 — MIT-BIH research engine
 
 **Status: Implemented.**
 
-- Python fuzzy classifier, Rough Set + fuzzy hybrid, canonical 47-feature Python schema.
+- Python fuzzy classifier, Rough Set + fuzzy hybrid, canonical 47-feature MIT-BIH schema.
 - Experiment pipeline, model comparisons, metrics, model saving/loading and Streamlit console.
-- Training-only imputation / feature selection and record split checks.
+- Training-only imputation / feature selection and patient-split checks.
 
 ## Phase 3 — Real MIT-BIH validation and reproducible experiments
 
-**Status: Implementation delivered; full-data execution remains a local step because MIT-BIH files are not bundled.**
+**Status: Implemented; full-data execution is a local step because the dataset is not bundled.**
 
 - Dataset inventory, AAMI annotation counts, class support, WFDB file checks and SHA-256 provenance.
-- Strict subject-disjoint default split; historical de Chazal record-wise compatibility retained with an explicit overlap warning for records 201/202.
+- Strict subject-disjoint default split and explicit warning for historical record-wise compatibility.
 - Automatic detector-based feature extraction for training and test records.
 - Separate R-peak detection metrics, conditional matched-beat classifier metrics, per-record results and record-cluster bootstrap intervals.
-- Dataset audit, validation and experiment CLI entry points plus Streamlit research-console views.
-- Tests run on deterministic fixtures and feature tables; real MIT-BIH metrics require local download and execution.
 
-## Phase 4 — Unified browser and Python API integration
+## Phase 4 — Python API and saved-model inference
 
-**Status: Implemented for local research orchestration.**
+**Status: Implemented.**
 
-- Added a local FastAPI service that serves the browser workspace and exposes health / dependency / dataset status.
-- Added background jobs and progress polling for dataset audits, independent R-peak validation and MIT-BIH classifier experiments.
-- Added saved experiment discovery, model-comparison summaries and allow-listed report downloads.
-- Added the Research Backend page to the browser navigation while retaining the synthetic demonstration as a separately labelled model path.
-- Added API integration tests and localhost-only run guidance.
+- FastAPI serves the browser interface and exposes MIT-BIH dataset, experiment, saved-model and inference endpoints.
+- CSV/TXT ECG upload validation, automatic preprocessing, R-peak detection, beat segmentation and saved-model predictions.
+- Beat-level AAMI predictions, model-specific score summaries and fuzzy rule explanations where supported.
+- Explainability, calibration diagnostics, feature drift reports and research artifacts.
 
-**Explicitly deferred:** raw ECG file upload into the Python inference path, Python model-backed per-beat prediction / explanation inside the browser, user authentication, remote deployment and job cancellation. Those require a separately versioned inference contract, strict input limits and additional validation; Phase 4 does not claim they exist.
+## Phase 5 — BIDMC multimodal research engine
 
-## Phase 5 — Saved-model ECG inference integration
+**Status: Integrated; BIDMC model training is intentionally pending.**
 
-**Status: Implemented and covered by automated tests; full MIT-BIH inference still requires a trained local model and the optional dataset / dependency setup.**
+- BIDMC CSV discovery, dataset inventory, record/channel metadata and patient grouping from source WFDB headers when available.
+- Synchronized 125 Hz ECG Lead II, PPG/PLETH and impedance RESP loading, with dual manual breath annotations.
+- Modality-specific window feature extraction and multimodal feature fusion.
+- Separate full multimodal feature export and leakage-controlled respiratory-rate estimation feature export.
+- Initial Rough-Set + fuzzy continuous respiratory-rate regressor interface. No BIDMC predictions are shown until a real model is trained and evaluated.
 
-- Added a saved-model catalog limited to compatible MIT-BIH experiment manifests and model artifacts within the project `models/` directory.
-- Persisted training-only feature medians in new experiment manifests so inference applies the training preprocessing policy without fitting on uploaded data.
-- Added validated CSV/TXT parsing with file-size, duration, sampling-rate, numeric-channel, missing-value and constant-signal checks.
-- Added Python inference using the same preprocessing, automatic R-peak detection, beat segmentation and canonical feature schema used by the research pipeline.
-- Added beat-level AAMI predictions, model-specific score summaries, per-class counts, low-score-separation review flags and downloadable CSV/JSON artifacts.
-- Added on-demand fuzzy rule / membership explanations for fuzzy-only and Rough-Set + fuzzy models; baseline models clearly report that rule explanations are unavailable.
-- Added a Model Inference page to the Apple-inspired web application while keeping the earlier synthetic demonstration separately labelled.
-- Raw uploaded ECG samples are processed in memory and are not persisted; derived features and prediction outputs are stored locally under `experiments/`.
-- Added API, parser, model-registry, saved-artifact, inference and explanation tests.
+## Phase 6 — Unified two-engine browser interface
 
-**Constraints:** CSV/TXT only (no WFDB pair upload yet); one or two numeric ECG channels; 20 MB maximum; 3 seconds to 10 minutes; 100–2000 Hz. The API remains unauthenticated and must be bound to `127.0.0.1`. The inference output is not clinically validated.
+**Status: Implemented.**
 
-**Deferred beyond Phase 5:** full browser end-to-end automation in a real browser, profiling on long real MIT-BIH signals, repeated patient-wise cross-validation, ablation studies, external validation, authentication and remote deployment.
+- Browser is now an API-backed presentation/control interface only.
+- Removed the former synthetic ECG generator, in-browser training/classifiers, simulated charts and browser demo smoke test.
+- Added separate MIT-BIH ECG and BIDMC multimodal workspaces with engine-specific status, controls and results.
+- Included the supplied patient-disjoint MIT-BIH model artifacts and their experiment reports.
 
+## Next planned work
 
-## Phase 6 — Explainability and score validation
+- Train BIDMC respiratory-rate models in Kaggle using patient-grouped splits.
+- Compare PPG-only, ECG+PPG and full ECG+PPG+RESP descriptive/fusion experiments; keep respiratory-target leakage controls explicit.
+- Evaluate with reference annotations from both manual annotators and report MAE, RMSE, bias and agreement.
+- Export a versioned BIDMC training artifact bundle and connect it to a separately versioned inference route.
+- Re-train MIT-BIH with the current adaptive R-peak detector before treating the supplied historical artifacts as matched to current preprocessing.
 
-**Status: Implemented and covered by deterministic unit / API tests; real MIT-BIH execution remains a local validation step.**
+## Research boundaries
 
-- Added patient/record-grouped out-of-fold temperature scaling using training records only; the untouched held-out split is never used to fit the transform.
-- Added fold-specific training-only median imputation within the calibration folds.
-- Added held-out multiclass Brier / log-loss, top-label and classwise ECE, reliability bins, and model-specific score-semantics reporting.
-- Added per-patient held-out metrics and patient-cluster bootstrap intervals, with record fallback when patient identifiers are not provided.
-- Added local single-feature training-median reference ablation, plus Random Forest impurity and fuzzy-rule usage summaries where supported.
-- Added training-only feature quantile references and per-beat / per-feature input drift reports for saved-model inference.
-- Added selected-beat preprocessed waveform previews using a bounded process-memory cache; preview waveforms are not persisted to disk.
-- Extended the browser interface, research report, API and test suite with these diagnostics.
-
-**Interpretation boundary:** internal temperature scaling is not external / clinical calibration; local ablation is not causal attribution or SHAP; drift flags are descriptive only. MIT-BIH dataset performance requires a local real-data run and remains unclaimed until completed.
+PulseLab is an academic prototype, not a medical device. BIDMC outputs are unavailable until a real training run is produced. Dataset-derived windows must be split by patient group to prevent leakage. Internal performance does not establish clinical validity or external generalisation.

@@ -1,0 +1,65 @@
+{
+  "available": true,
+  "method": "normalised fuzzy-rule antecedent weight \u00d7 support",
+  "features": [
+    {
+      "feature": "c1_energy",
+      "importance": 0.11993480415053176
+    },
+    {
+      "feature": "c0_wav_d2",
+      "importance": 0.10941010855243201
+    },
+    {
+      "feature": "c0_r_amp",
+      "importance": 0.1077580518428646
+    },
+    {
+      "feature": "rr_prev",
+      "importance": 0.1015324484267365
+    },
+    {
+      "feature": "c0_mean_pre_r",
+      "importance": 0.08611015552828928
+    },
+    {
+      "feature": "c1_mean_pre_r",
+      "importance": 0.08474598019510295
+    },
+    {
+      "feature": "c1_psd_5_15",
+      "importance": 0.0680765050711146
+    },
+    {
+      "feature": "c0_skewness",
+      "importance": 0.06640736356539456
+    },
+    {
+      "feature": "rr_ratio_prev",
+      "importance": 0.06183398034726798
+    },
+    {
+      "feature": "rr_ratio_next",
+      "importance": 0.05831601440129876
+    },
+    {
+      "feature": "rr_next",
+      "importance": 0.05121137679626372
+    },
+    {
+      "feature": "c0_qrs_dur",
+      "importance": 0.05059569622334623
+    },
+    {
+      "feature": "c0_ptp",
+      "importance": 0.02289462122175011
+    },
+    {
+      "feature": "c1_qrs_dur",
+      "importance": 0.011172893677606904
+    }
+  ],
+  "limitations": [
+    "This aggregates rule usage, not causal importance or held-out permutation importance."
+  ]
+}
