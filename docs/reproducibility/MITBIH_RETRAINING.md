@@ -25,6 +25,12 @@ The workflow uses Python 3.13.18 and the exact versions pinned in requirements/m
 - Models: the current Rough-Set + Fuzzy and fuzzy-only models plus the configured conventional baselines.
 - The classifier evaluation is conditional on detected beats matched one-to-one to reference beat annotations. R-peak sensitivity, PPV, false positives and false negatives are reported separately.
 
+## Recovering a run whose training succeeded but packaging failed
+
+Use **Actions → Recover MIT-BIH model package → Run workflow** and provide the original training workflow run ID. The recovery workflow downloads that run's already-trained model/report artifact, downloads the exact 43 configured WFDB records for dataset hashes, validates and packages the existing outputs, and uploads a verified ZIP. It does **not** retrain the models. The default input is the successful training run `44143473651`.
+
+The packager can be invoked either as `python -m tools.package_mitbih_run` from the repository root or directly as `python tools/package_mitbih_run.py`; it bootstraps the repository root for either form.
+
 ## Packaging checks
 
 The package step fails rather than publishing a run unless:
