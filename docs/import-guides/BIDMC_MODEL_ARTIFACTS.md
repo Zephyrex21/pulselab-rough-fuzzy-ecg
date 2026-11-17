@@ -23,7 +23,7 @@ RESEARCH DESIGN
 - Held-out MAE on the mean-annotator target: ECG+PPG Rough-Fuzzy 3.260 BPM; PPG-only Rough-Fuzzy 3.130 BPM; median baseline 3.167 BPM. Results are modest and close to baseline.
 
 COMPATIBILITY
-The loader verifies SHA-256 hashes for VERSION, modules/bidmc_pipeline.py, modules/bidmc_model.py, modules/rough_set.py and modules/fuzzy_logic.py against the Kaggle export metadata. Do not alter those model-source files without retraining or deliberately migrating and revalidating the models. The runtime versions used during training are documented in requirements/bidmc-model-runtime.txt.
+The loader verifies SHA-256 hashes for VERSION, modules/bidmc_pipeline.py, modules/bidmc_model.py, modules/rough_set.py and modules/fuzzy_logic.py against the Kaggle export metadata. Do not alter those model-source files without retraining or deliberately migrating and revalidating the models. The runtime versions used during training are documented in requirements/bidmc-model-runtime.txt. It also verifies trusted SHA-256 checksums for both Joblib estimators and all allow-listed model/evaluation artifacts before deserializing the models. Do not edit, recompress or replace these files without regenerating the trusted checksum manifest from a verified training export. Patient-disjoint feature exports require verified MIMIC-II patient IDs from every WFDB header; record-level fallback IDs are not accepted as subject IDs.
 
 The dataset itself is not bundled in the project ZIP. Extract BIDMC v1.0.0 under data/bidmc/ so the application can index the CSV files.
 
