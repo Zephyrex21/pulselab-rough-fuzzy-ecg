@@ -36,13 +36,15 @@
 
 ## Phase 5 — BIDMC multimodal research engine
 
-**Status: Integrated; BIDMC model training is intentionally pending.**
+**Status: Implemented; Kaggle training artifacts and saved-model inference are integrated.**
 
 - BIDMC CSV discovery, dataset inventory, record/channel metadata and patient grouping from source WFDB headers when available.
 - Synchronized 125 Hz ECG Lead II, PPG/PLETH and impedance RESP loading, with dual manual breath annotations.
 - Modality-specific window feature extraction and multimodal feature fusion.
 - Separate full multimodal feature export and leakage-controlled respiratory-rate estimation feature export.
-- Initial Rough-Set + fuzzy continuous respiratory-rate regressor interface. No BIDMC predictions are shown until a real model is trained and evaluated.
+- Continuous Rough-Set + fuzzy respiratory-rate regressor with two source-hash-verified trained models (ECG+PPG primary and PPG-only comparison).
+- Patient-disjoint Kaggle metrics, reports, final model artifacts and per-record Python prediction endpoint.
+- Frontend model status, held-out metrics, model selector and real-record inference view. Record replay is clearly separated from held-out evaluation.
 
 ## Phase 6 — Unified two-engine browser interface
 
@@ -55,12 +57,11 @@
 
 ## Next planned work
 
-- Train BIDMC respiratory-rate models in Kaggle using patient-grouped splits.
-- Compare PPG-only, ECG+PPG and full ECG+PPG+RESP descriptive/fusion experiments; keep respiratory-target leakage controls explicit.
-- Evaluate with reference annotations from both manual annotators and report MAE, RMSE, bias and agreement.
-- Export a versioned BIDMC training artifact bundle and connect it to a separately versioned inference route.
+- Improve BIDMC respiratory-rate features and modeling, because the first held-out results are close to the median baseline.
+- Investigate whether PPG-only and ECG+PPG add reproducible value on more than one fixed patient split; retain the two annotator-specific evaluations and RESP leakage safeguards.
+- Add repeat patient-grouped evaluation / robustness analysis and, where possible, independent external validation.
 - Re-train MIT-BIH with the current adaptive R-peak detector before treating the supplied historical artifacts as matched to current preprocessing.
 
 ## Research boundaries
 
-PulseLab is an academic prototype, not a medical device. BIDMC outputs are unavailable until a real training run is produced. Dataset-derived windows must be split by patient group to prevent leakage. Internal performance does not establish clinical validity or external generalisation.
+PulseLab is an academic prototype, not a medical device. BIDMC outputs are academic estimates from the installed trained model. Record-replay predictions are not independent test results because final models were refitted on all labelled windows. Dataset-derived windows must be split by patient group to prevent leakage. Internal performance does not establish clinical validity or external generalisation.

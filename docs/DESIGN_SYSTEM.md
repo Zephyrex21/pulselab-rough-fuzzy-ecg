@@ -36,7 +36,7 @@ The application supports `light` and `dark` themes through the root `data-theme`
 - **KPI tiles:** tabular values, compact labels and muted secondary surfaces.
 - **Controls:** visible focus treatment, clear active state and comfortable pointer targets.
 - **Tables:** sticky, quiet headers; readable row spacing; horizontal overflow on narrow screens.
-- **Status labels:** distinguish saved experiment outputs, raw dataset availability, feature exports and models awaiting training.
+- **Status labels:** distinguish trained model availability, raw dataset availability, feature exports, held-out evaluation and retrospective record replay.
 
 ## Interaction and accessibility principles
 
@@ -55,4 +55,4 @@ The MIT-BIH AAMI class palette is retained for continuity: N green, S blue, V re
 
 ## Product-language guidance
 
-Describe PulseLab as an academic research prototype. Clearly distinguish the MIT-BIH AAMI arrhythmia-classification engine from the BIDMC multimodal respiratory-rate research engine. Never present training-pending BIDMC output as a prediction. Avoid diagnosis, clinical accuracy or validated-performance claims.
+Describe PulseLab as an academic research prototype. Clearly distinguish the MIT-BIH AAMI arrhythmia-classification engine from the BIDMC multimodal respiratory-rate research engine. Only show BIDMC predictions when the source-hash-verified saved Python models are loaded; distinguish record-replay estimates from held-out evaluation metrics. Avoid diagnosis, clinical accuracy or validated-performance claims.

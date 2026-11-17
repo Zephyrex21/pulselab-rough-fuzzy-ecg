@@ -11,7 +11,7 @@
 - Added BIDMC dataset discovery, metadata inventory, patient-group identification and loading of ECG II, PPG/PLETH, RESP, monitor numerics and dual manual breath annotations.
 - Added aligned window-level features for each modality and multimodal fusion.
 - Added a leakage-controlled respiratory-rate feature export that excludes RESP-derived predictors when the target is derived from RESP breath annotations.
-- Added a Rough-Set + fuzzy respiratory-rate regression model interface; training and evaluation are deliberately deferred to the user's next Kaggle run.
+- Added the Rough-Set + fuzzy respiratory-rate regression implementation; the trained Kaggle estimators and inference integration are recorded in the post-training entry below.
 - Added BIDMC status, signal-preview and asynchronous feature-export API endpoints.
 
 **MIT-BIH artifacts and reproducibility**
@@ -21,6 +21,15 @@
 **Validation**
 - Removed the obsolete browser demo smoke test and replaced it with API/front-end and BIDMC pipeline tests.
 - Verified the BIDMC loader and feature extractor against a real uploaded BIDMC record.
+
+
+**Post-training BIDMC model integration**
+- Added the Kaggle-trained ECG+PPG primary and PPG-only comparison Rough-Fuzzy regression artifacts under the versioned BIDMC run ID.
+- Preserved the patient-disjoint comparison, per-patient metrics, test predictions, run manifest, source/runtime metadata, annotation agreement and full feature exports.
+- Added source SHA-256 verification before loading the Joblib estimators, plus model-status and safe report-download API endpoints.
+- Added real-record BIDMC prediction through the Python engine and a frontend estimator selector with per-window results.
+- Clearly labels final-model record replay as retrospective/in-sample; held-out results remain the source of generalization metrics.
+- Documented the modest held-out performance and its limited difference from the median baseline.
 
 ## 0.6.1 — Bug-fix and UI pass
 

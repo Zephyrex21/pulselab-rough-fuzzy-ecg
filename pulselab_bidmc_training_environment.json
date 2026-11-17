@@ -1,0 +1,21 @@
+{
+  "project": "PulseLab",
+  "run_id": "pulselab_bidmc_patient_disjoint_20261117T144120Z_2489",
+  "project_version": "0.7.0",
+  "python_version": "3.13.18",
+  "package_versions": {
+    "numpy": "2.1.3",
+    "pandas": "2.3.3",
+    "scipy": "1.16.3",
+    "scikit-learn": "1.6.1",
+    "joblib": "1.6.0",
+    "threadpoolctl": "3.7.0"
+  },
+  "source_sha256": {
+    "VERSION": "967d9afb101346667166f2e76e81910bc190488d7d41d50ca0072e9d92f00e32",
+    "modules/bidmc_pipeline.py": "28fef0d39abbaeb59cf6cedc83d7597b5dbe127843ada1801fd9ab07fc8146b6",
+    "modules/bidmc_model.py": "efb0c398cedd03a45c1d59033b153ecf7fd02e2d0dfcbda093e2c02c2aa6959a",
+    "modules/rough_set.py": "782ad0f28deb7fe795c1e9f35610ae44fe81a4a571b90f4a76f22959b933905a",
+    "modules/fuzzy_logic.py": "fb4b05d42445472622e36b1b95d3d96c5cc0160665a75a4bb5033e97073a1945"
+  }
+}

@@ -90,6 +90,6 @@ The exact artifact list depends on selected model options. Model files are gener
 
 - MIT-BIH records are not bundled. They are downloaded from PhysioNet on the user's machine using WFDB.
 - The default quick subset is an engineering smoke run, not a substitute for the complete DS1 / DS2 research evaluation.
-- The static Apple-inspired browser workspace continues to train its own synthetic demonstration models. Phase 2 does not silently connect it to the Python models; that integration belongs to a later phase.
+- Historical note: the original 0.6-era browser workspace contained a synthetic ECG demonstration with browser-side classifiers. That demonstration was removed in PulseLab 0.7.0; the current browser is an API-backed interface to the real Python research engines only.
 - Full MIT-BIH execution requires installing the dependencies in `requirements.txt` and downloading the dataset. Environments without WFDB / PyWavelets cannot perform record extraction.
 - PulseLab remains an academic research prototype, not a medical device. It has not been clinically validated.

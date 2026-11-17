@@ -4,7 +4,7 @@
 
 ## Purpose
 
-Phase 5 closes the Phase 4 gap between saved Python research models and the browser interface. It introduces a separate Model Inference workspace and a versioned-by-feature-schema upload contract. The older in-browser ECG demonstration remains synthetic and is not used by this path.
+Phase 5 closes the Phase 4 gap between saved Python research models and the browser interface. It introduces a separate Model Inference workspace and a versioned-by-feature-schema upload contract. This saved-model inference path is implemented in Python. The former synthetic browser demonstration has since been removed (see the historical note above).
 
 ## Inference data flow
 

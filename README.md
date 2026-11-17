@@ -23,9 +23,11 @@ PulseLab is an academic research prototype with **two independent real-data rese
 - Per-modality feature extraction and full ECG + PPG + RESP fusion.
 - Two independent manual breath annotations (ann1 and ann2) used to derive respiratory-rate reference targets.
 - A separate leakage-controlled respiratory-rate feature export excludes RESP-derived predictors when the target is derived from RESP annotations.
-- `RoughFuzzyRespiratoryRegressor` reuses the project's Rough Set selector and fuzzy rule classifier to produce continuous respiratory-rate estimates after a later training run.
+- Two final `RoughFuzzyRespiratoryRegressor` artifacts are installed: a primary ECG+PPG model and a PPG-only comparison model. Both use the existing Rough Set selector and fuzzy rule classifier.
+- Trained estimators load only after source-hash verification against the Kaggle run manifest. The browser calls the Python API for record-level inference; it does not run client-side model code.
+- The Kaggle experiment, model comparison, per-patient metrics, held-out predictions, manifest, annotation-agreement summary and synchronized feature exports are preserved under `experiments/pulselab_bidmc_patient_disjoint_20261117T144120Z_2489/`.
 
-**BIDMC model training is intentionally pending.** The current project includes dataset loading, waveform inspection, feature extraction, reference-label creation, export APIs and the Rough-Fuzzy regression model implementation. It does not display BIDMC predictions or performance metrics until trained artifacts are created using patient-grouped training/testing.
+**Training result caveat:** the held-out patient split contains 10 patients / 286 windows. On the mean annotator target, ECG+PPG Rough-Fuzzy achieved 3.260 BPM MAE and PPG-only achieved 3.130 BPM MAE, compared with 3.167 BPM for the median baseline. These are modest results near baseline (R² is near zero); further feature engineering and external validation are needed. The final saved models were subsequently refitted on all labelled windows, so record replay predictions are not independent held-out results.
 
 ## Dataset setup
 
@@ -63,6 +65,8 @@ python -m venv .venv
 # source .venv/bin/activate
 python -m pip install --upgrade pip
 pip install -r requirements.txt
+# For the closest match to the Kaggle BIDMC model runtime:
+pip install -r pulselab_bidmc_model_runtime_requirements.txt
 python -m uvicorn server:app --host 127.0.0.1 --port 8000
 ```
 
@@ -80,8 +84,8 @@ streamlit run app.py
 2. Open **BIDMC Multimodal** and check that all 53 signal/annotation CSVs are indexed.
 3. Inspect an actual ECG/PPG/RESP recording in the waveform preview.
 4. Export window-level feature tables. The API creates both `features_full_multimodal.csv` and `features_rr_estimation_no_resp_input.csv`.
-5. Train/evaluate later in Kaggle with **patient-grouped splits**. Overlapping windows from the same patient must never cross train/test boundaries.
-6. Export a BIDMC model artifact and connect the trained model to the inference interface in a subsequent integration step.
+5. The supplied Kaggle run used **patient-grouped splits**: 36 training patients and 10 held-out patients. Overlapping windows from one patient never cross the split.
+6. The trained ECG+PPG and PPG-only estimators are integrated. Choose a local record and estimator in **BIDMC Multimodal** to run saved Python inference. Record replay is descriptive; use the held-out report for generalization estimates.
 
 The dataset's MIMIC-II patient identifiers are read from accompanying WFDB headers when present. If the user has only CSV files and a subject ID cannot be identified, the loader uses an explicit record-level fallback identifier rather than guessing. Confirm patient grouping from the included metadata before publishing a patient-disjoint evaluation claim.
 
@@ -93,6 +97,9 @@ The dataset's MIMIC-II patient identifiers are read from accompanying WFDB heade
 - `GET /api/models` — discover compatible saved MIT-BIH models.
 - `POST /api/inference` — infer on an uploaded ECG CSV/TXT using a saved MIT-BIH model.
 - `GET /api/bidmc/status` — inspect BIDMC dataset availability and records.
+- `GET /api/bidmc/model/status` — trained model provenance, source-hash verification and held-out comparison.
+- `GET /api/bidmc/records/{record_id}/predictions?model=ecg_ppg|ppg_only` — run a saved estimator on real 32-second windows.
+- `GET /api/bidmc/model/artifacts/{filename}` — download allow-listed research reports / metrics.
 - `GET /api/bidmc/records/{record_id}/preview` — load real synchronized signal channels.
 - `POST /api/bidmc/feature-exports` — extract and persist multimodal window features and reference labels.
 - `GET /api/jobs/{job_id}` — poll a background research/export job.

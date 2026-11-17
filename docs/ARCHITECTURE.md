@@ -14,11 +14,11 @@ Core modules: `modules/data_loader.py`, `preprocessing.py`, `rpeak_detection.py`
 
 `BIDMC Signals/Breaths/Numerics CSVs → record and patient metadata discovery → ECG/PPG/RESP conditioning → synchronized windows → per-modality features → multimodal fusion → dual-annotator respiratory references → leakage-controlled feature export → patient-grouped Kaggle training → Rough-Fuzzy respiratory-rate regression`
 
-Core modules: `modules/bidmc_pipeline.py` (dataset discovery, record loading, preview, feature extraction and exports) and `modules/bidmc_model.py` (continuous regression using rough-set-selected features and fuzzy bin rules). The BIDMC model is not loaded or advertised as trained until a training artifact is supplied.
+Core modules: `modules/bidmc_pipeline.py` (dataset discovery, record loading, preview, feature extraction and exports), `modules/bidmc_model.py` (continuous regression using rough-set-selected features and fuzzy bin rules), and `modules/bidmc_inference.py` (source-hash verification, trained estimator loading and record-level inference). The integrated, versioned Kaggle run provides two estimators: ECG+PPG primary and PPG-only comparison. The browser accesses them only through the Python API.
 
 ## API and interface
 
-`server.py` exposes shared job polling plus separate MIT-BIH and BIDMC routes. `web/app.js` is an API client only; it contains no ECG generator, in-browser classifier or synthetic benchmark. `web/core.js` and the former browser demo smoke test have been removed.
+`server.py` exposes shared job polling plus separate MIT-BIH and BIDMC routes, including BIDMC model status, safe research-artifact downloads and real-record predictions. `web/app.js` is an API client only; it contains no ECG generator, in-browser classifier or synthetic benchmark. `web/core.js` and the former browser demo smoke test have been removed.
 
 ## Separation guarantees
 
@@ -26,4 +26,5 @@ Core modules: `modules/bidmc_pipeline.py` (dataset discovery, record loading, pr
 - Each pipeline owns its dataset configuration, feature schema and model artifacts.
 - BIDMC patient grouping is read from WFDB source metadata when available; CSV-only fallbacks are explicit and must be checked before patient-disjoint claims.
 - For respiratory-rate prediction from RESP-derived manual annotations, the provided RR-estimation feature table excludes RESP-derived inputs and RESP cross-correlations. The full-fusion table is preserved for descriptive/multimodal work and must not be used to claim a non-leaky PPG-only or ECG+PPG respiratory estimate.
-- Fitted imputers, rough-set feature selection, fuzzy membership functions and rule induction must use training patients only.
+- Fitted imputers, rough-set feature selection, fuzzy membership functions and rule induction must use training patients only. Final BIDMC estimators are refitted on all labelled windows after the held-out evaluation, so local record replay is retrospective rather than independent validation.
+- The BIDMC Joblib estimators are tied to SHA-256 hashes of the source files recorded in the Kaggle run environment. Changing those files requires retraining or a deliberate model migration with revalidation.

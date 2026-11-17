@@ -25,7 +25,7 @@ from starlette.concurrency import run_in_threadpool
 from pydantic import BaseModel, Field
 
 import config
-from modules import data_loader, dataset_audit, inference, pipeline, validation, bidmc_pipeline
+from modules import data_loader, dataset_audit, inference, pipeline, validation, bidmc_pipeline, bidmc_inference
 
 ROOT = Path(__file__).resolve().parent
 WEB_DIR = ROOT / "web"
@@ -35,8 +35,9 @@ logger = logging.getLogger("pulselab.api")
 app = FastAPI(
     title="PulseLab Research API",
     description=(
-        "Local API for dataset QA, R-peak validation, reproducible MIT-BIH "
-        "Rough-Fuzzy experiments, and saved-model ECG inference. Research use only; not a medical device."
+        "Local API for dataset QA, reproducible MIT-BIH ECG classification, saved-model ECG inference, "
+        "and BIDMC multimodal respiratory-rate feature extraction and trained Rough-Fuzzy inference. "
+        "Research use only; not a medical device."
     ),
     version="0.7.0",
     docs_url="/api/docs",
@@ -50,6 +51,8 @@ _JOBS: dict[str, dict] = {}
 _JOBS_LOCK = threading.Lock()
 _TERMINAL_STATES = {"completed", "failed"}
 _RUN_ID_RE = re.compile(r"^[A-Za-z0-9_.-]{1,100}$")
+_BIDMC_MODEL_REGISTRY: dict | None = None
+_BIDMC_MODEL_REGISTRY_LOCK = threading.Lock()
 
 
 class AuditRequest(BaseModel):
@@ -369,17 +372,87 @@ def _run_bidmc_feature_export(job_id: str, request: BIDMCFeatureExportRequest, p
         "target_definition": "Median interval-based breaths/min independently derived from ann1 and ann2; ref_rr_mean_bpm is the mean of available annotator rates.",
         "leakage_control": "The RR-estimation table excludes RESP-derived predictors and ECG/PPG-to-RESP correlations. Keep RESP as reference/auxiliary input for descriptive full-fusion analysis, not as a predictor when predicting a target derived from RESP annotations.",
         "patient_grouping": "Patient IDs are parsed from MIMIC-II source identifiers in WFDB headers when available; otherwise a record-level group is used and flagged by its bidmc_record_ prefix.",
-        "model_status": "No BIDMC model is trained by this export. Train and evaluate later using patient-grouped splits.",
+        "model_status": "Trained patient-disjoint BIDMC Rough-Fuzzy models are installed; this feature export does not retrain them.",
+        "trained_model_run_id": bidmc_inference.BIDMC_RUN_ID,
+
     }
     (output_dir / "feature_export_summary.json").write_text(json.dumps(_json_safe(summary), indent=2), encoding="utf-8")
     progress(0.95, "Writing export metadata")
     return summary
 
 
+def _get_bidmc_model_registry() -> dict:
+    """Load the versioned BIDMC model bundle once per API process."""
+    global _BIDMC_MODEL_REGISTRY
+    if _BIDMC_MODEL_REGISTRY is None:
+        with _BIDMC_MODEL_REGISTRY_LOCK:
+            if _BIDMC_MODEL_REGISTRY is None:
+                _BIDMC_MODEL_REGISTRY = bidmc_inference.load_trained_registry(
+                    config.ROOT, config.MODELS_DIR, EXPERIMENTS_DIR
+                )
+    return _BIDMC_MODEL_REGISTRY
+
+
+def _bidmc_model_status_payload() -> dict:
+    try:
+        registry = _get_bidmc_model_registry()
+        return {key: value for key, value in registry.items() if key not in {"models_loaded", "artifact_dir", "experiment_dir"}}
+    except bidmc_inference.BIDMCArtifactError as exc:
+        return {
+            "available": False,
+            "status": "missing_or_incompatible",
+            "run_id": bidmc_inference.BIDMC_RUN_ID,
+            "error": str(exc),
+            "clinical_status": "Academic research prototype; not clinically validated.",
+        }
+
+
 @app.get("/api/bidmc/status")
 def bidmc_status():
-    """Inspect local BIDMC dataset availability without running inference."""
-    return _json_safe(bidmc_pipeline.inventory(config.BIDMC_DATA_DIR))
+    """Inspect local BIDMC dataset availability."""
+    payload = bidmc_pipeline.inventory(config.BIDMC_DATA_DIR)
+    payload["trained_model_available"] = _bidmc_model_status_payload().get("available", False)
+    payload["message"] = (
+        "BIDMC signals and manual breath annotations are indexed. Trained patient-disjoint Rough-Fuzzy "
+        "respiratory-rate models are installed."
+        if payload.get("ready") and payload["trained_model_available"]
+        else payload.get("message", "BIDMC dataset is not ready.")
+    )
+    return _json_safe(payload)
+
+
+@app.get("/api/bidmc/model/status")
+def bidmc_model_status():
+    """Return provenance and held-out metrics for the trained BIDMC estimators."""
+    return _json_safe(_bidmc_model_status_payload())
+
+
+@app.get("/api/bidmc/model/artifacts/{filename}")
+def download_bidmc_model_artifact(filename: str):
+    """Download an allow-listed BIDMC training report or held-out evaluation artifact."""
+    if Path(filename).name != filename or filename not in bidmc_inference.ARTIFACT_FILES:
+        raise HTTPException(status_code=404, detail="BIDMC model artifact not found.")
+    path = (EXPERIMENTS_DIR / bidmc_inference.BIDMC_RUN_ID / filename).resolve()
+    if path.parent != (EXPERIMENTS_DIR / bidmc_inference.BIDMC_RUN_ID).resolve() or not path.is_file():
+        raise HTTPException(status_code=404, detail="BIDMC model artifact not found.")
+    return FileResponse(path, filename=filename)
+
+
+@app.get("/api/bidmc/records/{record_id}/predictions")
+def bidmc_record_predictions(record_id: str, model: Literal["ecg_ppg", "ppg_only"] = "ecg_ppg"):
+    """Run a saved BIDMC respiratory-rate estimator on actual record windows."""
+    try:
+        registry = _get_bidmc_model_registry()
+    except bidmc_inference.BIDMCArtifactError as exc:
+        raise HTTPException(status_code=503, detail=f"Trained BIDMC model is unavailable: {exc}") from exc
+    try:
+        record = bidmc_pipeline.load_record(record_id, config.BIDMC_DATA_DIR)
+        result = bidmc_inference.predict_record(record, registry["models_loaded"], model)
+        return _json_safe(result)
+    except bidmc_pipeline.BIDMCError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except bidmc_inference.BIDMCArtifactError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
 @app.get("/api/bidmc/records/{record_id}/preview")
@@ -433,6 +506,7 @@ def health():
         "wfdb_ready": deps["wfdb"],
         "dataset_records_available": len(available),
         "bidmc_records_available": bidmc_pipeline.inventory(config.BIDMC_DATA_DIR)["records_found"],
+        "bidmc_trained_models_available": _bidmc_model_status_payload().get("available", False),
         "saved_inference_models": len(inference.discover_saved_models(EXPERIMENTS_DIR, config.ROOT, config.MODELS_DIR)),
         "inference_upload_ready": all(deps[key] for key in ("numpy", "pandas", "scipy", "scikit_learn", "pywavelets", "python_multipart")),
         "dataset_root": str(config.DATA_DIR),
