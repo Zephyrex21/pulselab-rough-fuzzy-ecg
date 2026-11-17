@@ -30,6 +30,7 @@ SOURCE_FILES = [
     "modules/fuzzy_logic.py", "modules/baseline_models.py",
     "modules/metrics.py", "modules/calibration.py",
     "modules/explainability.py", "modules/validation.py",
+    "tools/package_mitbih_run.py", ".github/workflows/train-mitbih.yml",
 ]
 DISTRIBUTION_NAMES = {
     "numpy": "numpy", "pandas": "pandas", "scipy": "scipy",
@@ -177,8 +178,8 @@ def validate_and_package(project_root: Path, run_id: str, output_dir: Path) -> P
         for row in detection.get("per_record", [])
         if row.get("record") is not None or row.get("record_id") is not None
     }
-    if detector_records and detector_records != expected_records:
-        raise PackageValidationError("R-peak diagnostics do not cover exactly the 43 selected records.")
+    if detector_records != expected_records:
+        raise PackageValidationError("R-peak diagnostics must cover exactly all 43 selected records.")
 
     output_dir = output_dir.resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
