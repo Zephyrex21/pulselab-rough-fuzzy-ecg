@@ -121,6 +121,7 @@ Project guides, methodology, implementation notes, import guides, changelog and 
 ├── modules/        # Research pipelines, models and inference code
 ├── requirements/   # Pinned model-runtime dependency sets
 ├── tests/          # Automated tests
+├── tools/          # Reproducible training and artifact packaging utilities
 ├── web/            # Browser interface (Python API client only)
 ├── README.md       # Main project overview and setup guide
 ├── requirements.txt
