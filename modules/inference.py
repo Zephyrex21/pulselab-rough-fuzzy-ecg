@@ -8,6 +8,7 @@ selected-beat waveform windows are held in a bounded in-memory cache only.
 from __future__ import annotations
 
 import csv
+import hashlib
 from collections import OrderedDict
 from datetime import datetime, timezone
 import io
@@ -143,6 +144,22 @@ def _artifact_path(artifact_value: str, project_root: Path, models_root: Path) -
     return candidate
 
 
+def _verify_model_artifact_hash(path: Path, expected_hash: Any) -> str:
+    """Fail closed when a saved MIT-BIH model has no trusted checksum or was changed."""
+    if not isinstance(expected_hash, str) or not re.fullmatch(r"[0-9a-fA-F]{64}", expected_hash):
+        raise InferenceError(
+            "The saved model manifest does not contain a valid model-artifact SHA-256 checksum. "
+            "Re-train and re-export the model with the current PulseLab pipeline."
+        )
+    actual_hash = hashlib.sha256(path.read_bytes()).hexdigest()
+    if actual_hash.lower() != expected_hash.lower():
+        raise InferenceError(
+            "The saved MIT-BIH model artifact failed its SHA-256 integrity check. "
+            "The file may be corrupted or replaced; restore the original artifact or retrain the model."
+        )
+    return actual_hash
+
+
 def _expected_channel_count(feature_columns: list[str]) -> int:
     channel_indexes = []
     for name in feature_columns:
@@ -192,6 +209,7 @@ def discover_saved_models(
                     continue
                 try:
                     path = _artifact_path(artifact, project_root, models_root)
+                    artifact_hash = _verify_model_artifact_hash(path, (model_metrics or {}).get("model_artifact_sha256"))
                 except (InferenceError, OSError):
                     continue
                 results.append({
@@ -248,6 +266,7 @@ def get_saved_model_entry(
     if not isinstance(model_metrics, dict) or not model_metrics.get("model_artifact"):
         raise InferenceError("No saved artifact was found for this model. Re-run the experiment with model saving enabled.")
     artifact = _artifact_path(model_metrics["model_artifact"], project_root, models_root)
+    artifact_hash = _verify_model_artifact_hash(artifact, model_metrics.get("model_artifact_sha256"))
     feature_columns = list(manifest.get("feature_columns") or [])
     if not feature_columns:
         raise InferenceError("The run manifest does not contain the training feature schema.")
@@ -256,6 +275,7 @@ def get_saved_model_entry(
         "run_id": run_id,
         "model_name": model_name,
         "artifact_name": artifact.name,
+        "model_artifact_sha256": artifact_hash,
         "n_channels": channel_count,
         "n_features": len(feature_columns),
         "score_interpretation": (manifest.get("score_interpretation") or {}).get(model_name, "model score"),
