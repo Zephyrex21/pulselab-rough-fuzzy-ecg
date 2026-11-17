@@ -81,27 +81,6 @@
       ${artifacts.length?`<section class="result-section"><h3>Download inference artifacts</h3><div class="result-artifacts">${artifacts.map(name=>`<a class="btn" download href="/api/inferences/${encodeURIComponent(summary.inference_id)}/artifacts/${encodeURIComponent(name)}">${esc(name)} <span aria-hidden="true">↓</span></a>`).join('')}</div></section>`:''}
       <p class="result-disclaimer">${esc(summary.disclaimer||'Academic research prototype. Not clinically validated.')}</p>`;
   }
-  function markdownReportToHtml(markdown) {
-    const lines=String(markdown||'').replace(/\r/g,'').split('\n');
-    let html='',paragraph=[],listType=null,listItems=[],inCode=false,codeLines=[];
-    const flushParagraph=()=>{if(paragraph.length){html+=`<p>${paragraph.map(line=>inlineMarkdown(line)).join(' ')}</p>`;paragraph=[];}};
-    const flushList=()=>{if(listItems.length){html+=`<${listType}>${listItems.map(x=>`<li>${inlineMarkdown(x)}</li>`).join('')}</${listType}>`;listItems=[];listType=null;}};
-    for(const line of lines){
-      if(line.trim().startsWith('```')){flushParagraph();flushList();if(inCode){html+=`<pre class="report-code"><code>${esc(codeLines.join('\n'))}</code></pre>`;codeLines=[];inCode=false;}else inCode=true;continue;}
-      if(inCode){codeLines.push(line);continue;}
-      const heading=line.match(/^(#{1,4})\s+(.+)$/);
-      const bullet=line.match(/^\s*[-*+]\s+(.+)$/);
-      const ordered=line.match(/^\s*\d+[.)]\s+(.+)$/);
-      if(!line.trim()){flushParagraph();flushList();continue;}
-      if(heading){flushParagraph();flushList();const level=Math.min(4,heading[1].length);html+=`<h${level}>${inlineMarkdown(heading[2])}</h${level}>`;continue;}
-      if(/^\s*---+\s*$/.test(line)){flushParagraph();flushList();html+='<hr>';continue;}
-      if(bullet||ordered){flushParagraph();const nextType=ordered?'ol':'ul';if(listType&&listType!==nextType)flushList();listType=nextType;listItems.push((bullet||ordered)[1]);continue;}
-      flushList();paragraph.push(line.trim());
-    }
-    flushParagraph();flushList();if(inCode)html+=`<pre class="report-code"><code>${esc(codeLines.join('\n'))}</code></pre>`;
-    return html;
-  }
-  function inlineMarkdown(value) { return esc(value).replace(/`([^`]+)`/g,'<code>$1</code>').replace(/\*\*([^*]+)\*\*/g,'<strong>$1</strong>').replace(/\*([^*]+)\*/g,'<em>$1</em>'); }
   async function requestText(path) {
     const response=await fetch(API+path);
     const text=await response.text();
@@ -254,7 +233,7 @@
     const reportBtn=$('#view-bidmc-report');
     if(reportBtn) reportBtn.addEventListener('click',async()=>{
       reportBtn.disabled=true;reportBtn.textContent='Loading report…';
-      try {const markdown=await requestText('/bidmc/model/artifacts/research_report.md');showResultDialog('BIDMC research report',m.run_id||'Saved training report',`<article class="report-document">${markdownReportToHtml(markdown)}</article>`,`<a class="btn" download href="/api/bidmc/model/artifacts/research_report.md">Download Markdown report ↓</a>`);}
+      try {const [markdown,comparisonCsv]=await Promise.all([requestText('/bidmc/model/artifacts/research_report.md'),requestText('/bidmc/model/artifacts/model_comparison.csv')]);const reportHtml=window.PulseLabReportMarkdown.markdownReportToHtml(markdown,{heldoutComparisonCsv:comparisonCsv});showResultDialog('BIDMC research report',m.run_id||'Saved training report',`<article class="report-document">${reportHtml}</article>`,`<a class="btn" download href="/api/bidmc/model/artifacts/research_report.md">Download Markdown report ↓</a><a class="btn" download href="/api/bidmc/model/artifacts/model_comparison.csv">Download comparison CSV ↓</a>`);}
       catch(err){showResultDialog('Unable to load research report','The report could not be opened.',`<div class="inference-error">${esc(err.message)}</div>`);}
       finally {reportBtn.disabled=false;reportBtn.textContent='Read research report';}
     });
