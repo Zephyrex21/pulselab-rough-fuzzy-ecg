@@ -1,5 +1,10 @@
 from pathlib import Path
 
+import pytest
+from fastapi.testclient import TestClient
+
+import config
+import server
 from modules.bidmc_identity import audit_patient_identity, validate_patient_disjoint_manifest
 
 
@@ -98,3 +103,30 @@ def test_saved_split_validation_detects_patient_and_record_leakage(tmp_path):
     result = validate_patient_disjoint_manifest(audit, manifest)
     assert result["valid"] is False
     assert any("overlap" in issue for issue in result["issues"])
+
+
+def test_bidmc_api_does_not_present_record_fallback_as_patient_identity(tmp_path, monkeypatch):
+    _write_record(tmp_path, 1, "s01001")
+    _write_record(tmp_path, 2, None)
+    monkeypatch.setattr(config, "BIDMC_DATA_DIR", tmp_path)
+    with TestClient(server.app) as client:
+        payload = client.get("/api/bidmc/status").json()
+
+    assert payload["ready"] is True
+    assert payload["patient_grouping_verified"] is False
+    assert payload["patient_groups"] is None
+    records = {row["record_id"]: row for row in payload["records"]}
+    assert records["bidmc01"]["patient_id"] == "s01001"
+    assert records["bidmc01"]["patient_id_verified"] is True
+    assert records["bidmc02"]["patient_id"] is None
+    assert records["bidmc02"]["patient_id_verified"] is False
+    assert payload["patient_identity"]["records_unverified"] == 1
+
+
+def test_bidmc_feature_export_is_blocked_without_verified_patient_ids(tmp_path, monkeypatch):
+    _write_record(tmp_path, 1, None)
+    monkeypatch.setattr(config, "BIDMC_DATA_DIR", tmp_path)
+    request = server.BIDMCFeatureExportRequest(records=["bidmc01"])
+
+    with pytest.raises(Exception, match="Patient grouping is incomplete"):
+        server._run_bidmc_feature_export("fixture-job", request, lambda *_: None)
