@@ -1,4 +1,5 @@
 """API integration tests for the Phase 4 local research service."""
+import hashlib
 from fastapi.testclient import TestClient
 
 import config
@@ -245,7 +246,10 @@ def test_phase5_full_multipart_inference_round_trip(tmp_path, monkeypatch):
             "inference_pipeline_contract": current_mitbih_inference_contract(),
         },
         "score_interpretation": {"Fixture API model": "test model scores"},
-        "metrics": {"Fixture API model": {"model_artifact": f"models/{run_id}/{artifact.name}"}},
+        "metrics": {"Fixture API model": {
+            "model_artifact": f"models/{run_id}/{artifact.name}",
+            "model_artifact_sha256": hashlib.sha256(artifact.read_bytes()).hexdigest(),
+        }},
     }
     (run_dir / "run_manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
     monkeypatch.setattr(server, "EXPERIMENTS_DIR", experiments)

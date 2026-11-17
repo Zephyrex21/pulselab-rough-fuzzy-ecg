@@ -25,7 +25,7 @@ from starlette.concurrency import run_in_threadpool
 from pydantic import BaseModel, Field
 
 import config
-from modules import data_loader, dataset_audit, inference, pipeline, validation, bidmc_pipeline, bidmc_inference
+from modules import data_loader, dataset_audit, inference, pipeline, validation, bidmc_pipeline, bidmc_inference, bidmc_identity
 
 ROOT = Path(__file__).resolve().parent
 WEB_DIR = ROOT / "web"
@@ -339,7 +339,10 @@ def _read_experiment_summary(run_dir: Path) -> dict:
 
 def _run_bidmc_feature_export(job_id: str, request: BIDMCFeatureExportRequest, progress) -> dict:
     """Extract windowed multimodal BIDMC features and persist training-ready tables."""
-    progress(0.03, "Locating BIDMC CSV dataset")
+    identity_audit = bidmc_identity.audit_patient_identity(config.BIDMC_DATA_DIR)
+    if not identity_audit["all_records_verified"]:
+        raise bidmc_identity.BIDMCPatientIdentityError(identity_audit["message"])
+    progress(0.03, "Locating BIDMC CSV dataset and verifying patient identities")
     full, rr_safe = bidmc_pipeline.build_feature_dataset(
         config.BIDMC_DATA_DIR,
         record_ids=request.records or None,
@@ -362,6 +365,17 @@ def _run_bidmc_feature_export(job_id: str, request: BIDMCFeatureExportRequest, p
         "n_records": int(full["record_id"].nunique()) if not full.empty else 0,
         "n_patient_groups": len(patient_ids),
         "patient_ids": patient_ids,
+        "patient_grouping": {
+            "status": identity_audit["status"],
+            "verified": identity_audit["all_records_verified"],
+            "dataset_records_verified": identity_audit["records_verified"],
+            "dataset_records_total": identity_audit["records_total"],
+            "dataset_patient_groups": identity_audit["verified_patient_groups"],
+            "selected_records": int(full["record_id"].nunique()) if not full.empty else 0,
+            "selected_patient_groups": len(patient_ids),
+            "identity_source": "MIMIC-II subject IDs parsed from WFDB headers",
+        },
+        "train_ready_for_patient_disjoint_evaluation": identity_audit["all_records_verified"],
         "window_sec": request.window_sec,
         "stride_sec": request.stride_sec,
         "n_windows": int(len(full)),
@@ -371,7 +385,7 @@ def _run_bidmc_feature_export(job_id: str, request: BIDMCFeatureExportRequest, p
         "files": [full_path.name, safe_path.name],
         "target_definition": "Median interval-based breaths/min independently derived from ann1 and ann2; ref_rr_mean_bpm is the mean of available annotator rates.",
         "leakage_control": "The RR-estimation table excludes RESP-derived predictors and ECG/PPG-to-RESP correlations. Keep RESP as reference/auxiliary input for descriptive full-fusion analysis, not as a predictor when predicting a target derived from RESP annotations.",
-        "patient_grouping": "Patient IDs are parsed from MIMIC-II source identifiers in WFDB headers when available; otherwise a record-level group is used and flagged by its bidmc_record_ prefix.",
+        "patient_grouping_note": "Only verified MIMIC-II subject IDs from WFDB headers are accepted for patient-disjoint feature exports. Record-level fallback identifiers are not valid patient IDs.",
         "model_status": "Trained patient-disjoint BIDMC Rough-Fuzzy models are installed; this feature export does not retrain them.",
         "trained_model_run_id": bidmc_inference.BIDMC_RUN_ID,
 
@@ -396,7 +410,13 @@ def _get_bidmc_model_registry() -> dict:
 def _bidmc_model_status_payload() -> dict:
     try:
         registry = _get_bidmc_model_registry()
-        return {key: value for key, value in registry.items() if key not in {"models_loaded", "artifact_dir", "experiment_dir"}}
+        payload = {key: value for key, value in registry.items() if key not in {"models_loaded", "artifact_dir", "experiment_dir"}}
+        identity_audit = bidmc_identity.audit_patient_identity(config.BIDMC_DATA_DIR)
+        if identity_audit["records_total"]:
+            payload["local_patient_split_validation"] = bidmc_identity.validate_patient_disjoint_manifest(identity_audit, registry)
+        else:
+            payload["local_patient_split_validation"] = {"status": "not_checked", "valid": None, "issues": ["The local BIDMC dataset is not installed."]}
+        return payload
     except bidmc_inference.BIDMCArtifactError as exc:
         return {
             "available": False,
@@ -409,15 +429,37 @@ def _bidmc_model_status_payload() -> dict:
 
 @app.get("/api/bidmc/status")
 def bidmc_status():
-    """Inspect local BIDMC dataset availability."""
+    """Inspect local BIDMC dataset availability and verify subject identity from WFDB headers."""
     payload = bidmc_pipeline.inventory(config.BIDMC_DATA_DIR)
-    payload["trained_model_available"] = _bidmc_model_status_payload().get("available", False)
-    payload["message"] = (
-        "BIDMC signals and manual breath annotations are indexed. Trained patient-disjoint Rough-Fuzzy "
-        "respiratory-rate models are installed."
-        if payload.get("ready") and payload["trained_model_available"]
-        else payload.get("message", "BIDMC dataset is not ready.")
-    )
+    identity_audit = bidmc_identity.audit_patient_identity(config.BIDMC_DATA_DIR)
+    identity_by_record = {row["record_id"]: row for row in identity_audit["records"]}
+    for record in payload.get("records", []):
+        identity = identity_by_record.get(record.get("record_id"), {})
+        if not identity.get("patient_id_verified"):
+            record["record_group_id"] = record.get("patient_id")
+            record["patient_id"] = None
+        else:
+            record["patient_id"] = identity.get("patient_id")
+        record["patient_id_verified"] = bool(identity.get("patient_id_verified"))
+        record["identity_status"] = identity.get("identity_status", "not_indexed")
+    payload["reported_patient_groups"] = payload.get("patient_groups")
+    payload["patient_groups"] = identity_audit["verified_patient_groups"] if identity_audit["all_records_verified"] else None
+    payload["patient_grouping_verified"] = identity_audit["all_records_verified"]
+    payload["patient_identity"] = {
+        key: identity_audit[key] for key in (
+            "status", "all_records_verified", "records_total", "records_verified",
+            "records_unverified", "verified_patient_groups", "unverified_records", "message"
+        )
+    }
+    model_status = _bidmc_model_status_payload()
+    payload["trained_model_available"] = model_status.get("available", False)
+    payload["trained_model_patient_split_validation"] = model_status.get("local_patient_split_validation")
+    if not identity_audit["all_records_verified"]:
+        payload["message"] = identity_audit["message"]
+    elif payload.get("ready") and payload["trained_model_available"]:
+        payload["message"] = "BIDMC signals, annotations and all 53 patient identities are verified. Trained patient-disjoint Rough-Fuzzy respiratory-rate models are installed."
+    else:
+        payload["message"] = payload.get("message", "BIDMC dataset is not ready.")
     return _json_safe(payload)
 
 
@@ -448,6 +490,13 @@ def bidmc_record_predictions(record_id: str, model: Literal["ecg_ppg", "ppg_only
     try:
         record = bidmc_pipeline.load_record(record_id, config.BIDMC_DATA_DIR)
         result = bidmc_inference.predict_record(record, registry["models_loaded"], model)
+        identity_audit = bidmc_identity.audit_patient_identity(config.BIDMC_DATA_DIR)
+        verified_patient = (identity_audit.get("record_to_patient") or {}).get(record.record_id)
+        result["patient_id"] = verified_patient
+        result["patient_identity_verified"] = verified_patient is not None
+        result["patient_identity_status"] = "verified" if verified_patient else "unverified"
+        if verified_patient is None:
+            result["patient_identity_note"] = "The WFDB header did not provide an unambiguous MIMIC-II subject ID. This single-record replay is not evidence of patient-level grouping."
         return _json_safe(result)
     except bidmc_pipeline.BIDMCError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -459,7 +508,13 @@ def bidmc_record_predictions(record_id: str, model: Literal["ecg_ppg", "ppg_only
 def bidmc_record_preview(record_id: str, start_sec: float = 0.0, duration_sec: float = 20.0):
     try:
         record = bidmc_pipeline.load_record(record_id, config.BIDMC_DATA_DIR)
-        return _json_safe(bidmc_pipeline.extract_preview(record, start_sec, duration_sec))
+        preview = bidmc_pipeline.extract_preview(record, start_sec, duration_sec)
+        identity_audit = bidmc_identity.audit_patient_identity(config.BIDMC_DATA_DIR)
+        verified_patient = (identity_audit.get("record_to_patient") or {}).get(record.record_id)
+        preview["patient_id"] = verified_patient
+        preview["patient_identity_verified"] = verified_patient is not None
+        preview["patient_identity_status"] = "verified" if verified_patient else "unverified"
+        return _json_safe(preview)
     except bidmc_pipeline.BIDMCError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 

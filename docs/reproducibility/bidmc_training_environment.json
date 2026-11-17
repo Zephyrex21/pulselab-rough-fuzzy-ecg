@@ -17,5 +17,15 @@
     "modules/bidmc_model.py": "efb0c398cedd03a45c1d59033b153ecf7fd02e2d0dfcbda093e2c02c2aa6959a",
     "modules/rough_set.py": "782ad0f28deb7fe795c1e9f35610ae44fe81a4a571b90f4a76f22959b933905a",
     "modules/fuzzy_logic.py": "fb4b05d42445472622e36b1b95d3d96c5cc0160665a75a4bb5033e97073a1945"
+  },
+  "artifact_sha256": {
+    "models/pulselab_bidmc_patient_disjoint_20261117T144120Z_2489/bidmc_rough_fuzzy_ecg_ppg_rr_mean.joblib": "ce20f3102dad409f163eae5e3b82f3834b394eea5081efe890087235523cf736",
+    "models/pulselab_bidmc_patient_disjoint_20261117T144120Z_2489/bidmc_rough_fuzzy_ppg_only_rr_mean.joblib": "6531d1634355293be33bec9da3cf824d0f0c78d4389d58bb7cd17dbcfc4f7d13",
+    "experiments/pulselab_bidmc_patient_disjoint_20261117T144120Z_2489/annotation_agreement.json": "4844adc67bb9ed286e8265de36b3a3550936b0cec205a6de3b7ff69b5e8318b2",
+    "experiments/pulselab_bidmc_patient_disjoint_20261117T144120Z_2489/model_comparison.csv": "cc9e8d912cc767d510a021bb0f9391e5652fb6bce228fefa494f0141a9eaeaa6",
+    "experiments/pulselab_bidmc_patient_disjoint_20261117T144120Z_2489/per_patient_metrics.csv": "a6645cf1c8000d347286b31400e73954d55f226aafb42fb3433c42ba2e9d1db1",
+    "experiments/pulselab_bidmc_patient_disjoint_20261117T144120Z_2489/research_report.md": "66fec9dd5f611d9f8d39ff7e6069d1bc927404f0ad8c9261d6af9d36eb69657b",
+    "experiments/pulselab_bidmc_patient_disjoint_20261117T144120Z_2489/run_manifest.json": "a73ac5e36a1c1882f88b61ee1f3ac1d4def052462d471ea25d1abe3872d468ae",
+    "experiments/pulselab_bidmc_patient_disjoint_20261117T144120Z_2489/test_predictions.csv": "1de90c392d96bbf00f1574a3a6afabc1ef24665a9530ec3ec7a19c4bfae7a94c"
   }
 }

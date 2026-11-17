@@ -1,7 +1,11 @@
+import hashlib
 import json
 import numpy as np
+
 import pandas as pd
 import pytest
+
+import config
 
 from modules.pipeline import run_feature_experiment
 
@@ -233,3 +237,20 @@ def test_default_record_pipeline_stamps_current_inference_compatibility_contract
     manifest = json.loads((output / "run_manifest.json").read_text(encoding="utf-8"))
     assert manifest["metadata"]["peak_source"] == "detected"
     assert manifest["metadata"]["inference_pipeline_contract"] == current_mitbih_inference_contract()
+
+
+def test_saved_mitbih_models_are_stamped_with_sha256(tmp_path, monkeypatch):
+    train, test = feature_tables()
+    models_root = tmp_path / "models"
+    monkeypatch.setattr(config, "MODELS_DIR", models_root)
+    monkeypatch.setattr(config, "ROOT", tmp_path)
+    output = run_feature_experiment(
+        train, test, feature_columns=["f1", "f2", "f3"],
+        output_root=tmp_path / "experiments", include_baselines=False,
+        save_models=True, run_name="artifact-hash-check",
+    )
+    manifest = json.loads((output / "run_manifest.json").read_text(encoding="utf-8"))
+    for model_name, metrics in manifest["metrics"].items():
+        artifact = tmp_path / metrics["model_artifact"]
+        assert artifact.is_file()
+        assert metrics["model_artifact_sha256"] == hashlib.sha256(artifact.read_bytes()).hexdigest()

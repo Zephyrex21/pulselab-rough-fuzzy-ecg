@@ -1,3 +1,4 @@
+import hashlib
 import json
 from pathlib import Path
 
@@ -63,6 +64,7 @@ def _make_saved_run(tmp_path: Path):
         "score_interpretation": {"Fixture model": "fixture ranking scores"},
         "metrics": {"Fixture model": {
             "model_artifact": f"models/{run_id}/{artifact.name}",
+            "model_artifact_sha256": hashlib.sha256(artifact.read_bytes()).hexdigest(),
             "score_calibration": {"status": "fitted", "temperature": 0.5},
         }},
     }
@@ -218,4 +220,16 @@ def test_annotation_guided_model_is_not_discovered_for_uploaded_signal_inference
 
     assert inference.discover_saved_models(experiments, project, models) == []
     with pytest.raises(inference.InferenceError, match="annotation-guided runs are benchmark-only"):
+        inference.get_saved_model_entry(run_id, "Fixture model", experiments, project, models)
+
+
+def test_saved_model_discovery_and_loading_reject_tampered_artifact_hash(tmp_path):
+    experiments, project, models, run_id, _ = _make_saved_run(tmp_path)
+    manifest_path = experiments / run_id / "run_manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["metrics"]["Fixture model"]["model_artifact_sha256"] = "0" * 64
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+    assert inference.discover_saved_models(experiments, project, models) == []
+    with pytest.raises(inference.InferenceError, match="SHA-256 integrity check"):
         inference.get_saved_model_entry(run_id, "Fixture model", experiments, project, models)

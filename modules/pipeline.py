@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+import hashlib
 import json
 import re
 import time
@@ -391,6 +392,7 @@ def run_feature_experiment(
             model_path = model_dir / f"{slug}.joblib"
             joblib.dump(model, model_path, compress=3)
             metrics["model_artifact"] = str(model_path.relative_to(config.ROOT)) if model_path.is_relative_to(config.ROOT) else str(model_path)
+            metrics["model_artifact_sha256"] = hashlib.sha256(model_path.read_bytes()).hexdigest()
         cm_frame = pd.DataFrame(metrics["confusion_matrix"], index=config.CLASSES, columns=config.CLASSES)
         cm_frame.index.name = "actual\\predicted"
         cm_frame.to_csv(run_dir / f"{slug}_confusion_matrix.csv")

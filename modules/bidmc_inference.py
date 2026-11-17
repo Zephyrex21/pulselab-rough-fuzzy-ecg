@@ -68,7 +68,8 @@ def load_trained_registry(project_root: str | Path, models_root: str | Path, exp
     comparison_path = experiment_dir / "model_comparison.csv"
     agreement_path = experiment_dir / "annotation_agreement.json"
 
-    required = [env_path, manifest_path, comparison_path, agreement_path]
+    required = [env_path]
+    required.extend(experiment_dir / name for name in ARTIFACT_FILES)
     required.extend(model_dir / name for name in MODEL_FILES.values())
     missing = [str(p) for p in required if not p.is_file()]
     if missing:
@@ -83,8 +84,17 @@ def load_trained_registry(project_root: str | Path, models_root: str | Path, exp
     if str(environment.get("project_version")) != str(manifest.get("project_version")):
         raise BIDMCArtifactError("BIDMC training environment and run manifest report different project versions.")
 
-    # Verify only the source files the Kaggle manifest declares as model provenance.
+    # The trained run must declare the source code used to produce its model.
     source_hashes = environment.get("source_sha256") or manifest.get("source_sha256") or {}
+    if not isinstance(source_hashes, dict) or not source_hashes:
+        raise BIDMCArtifactError("BIDMC training environment is missing source SHA-256 provenance.")
+    required_source_files = {
+        "VERSION", "modules/bidmc_pipeline.py", "modules/bidmc_model.py",
+        "modules/rough_set.py", "modules/fuzzy_logic.py",
+    }
+    if not required_source_files.issubset(source_hashes):
+        missing_source_hashes = sorted(required_source_files - set(source_hashes))
+        raise BIDMCArtifactError(f"BIDMC source provenance is incomplete: {missing_source_hashes}")
     checked_hashes: dict[str, bool] = {}
     for relative, expected in source_hashes.items():
         source_path = project_root / relative
@@ -97,6 +107,27 @@ def load_trained_registry(project_root: str | Path, models_root: str | Path, exp
             raise BIDMCArtifactError(
                 f"BIDMC model source compatibility check failed for {relative}; "
                 "the trained artifact was produced from a different source revision."
+            )
+
+    # Verify the independently distributed model files and evaluation artifacts
+    # before parsing reports or deserializing Joblib data.
+    expected_artifact_hashes = environment.get("artifact_sha256")
+    artifact_paths = {
+        **{f"models/{BIDMC_RUN_ID}/{name}": model_dir / name for name in MODEL_FILES.values()},
+        **{f"experiments/{BIDMC_RUN_ID}/{name}": experiment_dir / name for name in ARTIFACT_FILES},
+    }
+    if not isinstance(expected_artifact_hashes, dict):
+        raise BIDMCArtifactError("BIDMC training environment is missing artifact SHA-256 checksums.")
+    checked_artifact_hashes: dict[str, bool] = {}
+    for relative, path in artifact_paths.items():
+        expected = expected_artifact_hashes.get(relative)
+        if not isinstance(expected, str) or len(expected) != 64:
+            raise BIDMCArtifactError(f"Missing or invalid SHA-256 checksum for BIDMC artifact: {relative}")
+        actual = hashlib.sha256(path.read_bytes()).hexdigest()
+        checked_artifact_hashes[relative] = actual == expected.lower()
+        if actual != expected.lower():
+            raise BIDMCArtifactError(
+                f"BIDMC artifact integrity check failed for {relative}; the file is missing, corrupted, or has been replaced."
             )
 
     models: dict[str, RoughFuzzyRespiratoryRegressor] = {}
@@ -140,6 +171,10 @@ def load_trained_registry(project_root: str | Path, models_root: str | Path, exp
         "predictor_policy": manifest.get("predictor_policy", "PPG-only or ECG+PPG; RESP-derived predictors excluded."),
         "n_train_patients": len(manifest.get("train_patient_ids", [])),
         "n_test_patients": len(manifest.get("test_patient_ids", [])),
+        "train_patient_ids": list(map(str, manifest.get("train_patient_ids", []))),
+        "test_patient_ids": list(map(str, manifest.get("test_patient_ids", []))),
+        "train_records": list(map(str, manifest.get("train_records", []))),
+        "test_records": list(map(str, manifest.get("test_records", []))),
         "n_train_windows": max(0, labelled_windows - heldout_windows),
         "n_test_windows": heldout_windows,
         "models": {
@@ -161,7 +196,9 @@ def load_trained_registry(project_root: str | Path, models_root: str | Path, exp
         "annotation_agreement": agreement,
         "evaluation_note": manifest.get("evaluation_note", "Held-out patient results are research estimates, not clinical validation."),
         "clinical_status": manifest.get("clinical_status", "Academic research prototype; not clinically validated."),
-        "source_hashes_verified": all(checked_hashes.values()) if checked_hashes else False,
+        "source_hashes_verified": all(checked_hashes.values()),
+        "artifact_hashes_verified": all(checked_artifact_hashes.values()),
+        "verified_artifact_count": len(checked_artifact_hashes),
         "training_python_version": environment.get("python_version"),
         "training_package_versions": environment.get("package_versions", {}),
         "models_loaded": models,

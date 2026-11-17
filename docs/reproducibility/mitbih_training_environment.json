@@ -13,5 +13,11 @@
     "joblib": "1.6.0",
     "threadpoolctl": "3.7.0"
   },
-  "important_note": "For reliable Joblib/scikit-learn loading, use the same Python minor version and install the exact package versions listed in the accompanying runtime requirements file."
+  "important_note": "For reliable Joblib/scikit-learn loading, use the same Python minor version and install the exact package versions listed in the accompanying runtime requirements file.",
+  "artifact_sha256": {
+    "models/pulselab_patient_disjoint_detected_20261114T053618Z_5383/a_fuzzy_all_features.joblib": "f1d5bb805ca6b7c232180a910bf7afeae3322eac36f1837db6b0cb77f576ef70",
+    "models/pulselab_patient_disjoint_detected_20261114T053618Z_5383/b_rough_set_fuzzy.joblib": "0e2141be20299e29b94a44dd3d201d5ffd49277eed1b632da4bfd6b0a85ee53a",
+    "models/pulselab_patient_disjoint_detected_20261114T053618Z_5383/c1_random_forest.joblib": "6e1f073850a58ac282a0055bb6ac5f01115523756775cd77b3a82be4c2065b19",
+    "models/pulselab_patient_disjoint_detected_20261114T053618Z_5383/c2_svm_rbf.joblib": "a7b554370f4054f4fde3dc109f6b3928b314973d47dc39285441825cd7585160"
+  }
 }
