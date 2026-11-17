@@ -5,7 +5,11 @@ from fastapi.testclient import TestClient
 
 import config
 import server
-from modules.bidmc_identity import audit_patient_identity, validate_patient_disjoint_manifest
+from modules.bidmc_identity import (
+    BIDMCPatientIdentityError,
+    audit_patient_identity,
+    validate_patient_disjoint_manifest,
+)
 
 
 def _write_record(root: Path, record_number: int, patient_id: str | None):
@@ -128,5 +132,5 @@ def test_bidmc_feature_export_is_blocked_without_verified_patient_ids(tmp_path, 
     monkeypatch.setattr(config, "BIDMC_DATA_DIR", tmp_path)
     request = server.BIDMCFeatureExportRequest(records=["bidmc01"])
 
-    with pytest.raises(Exception, match="Patient grouping is incomplete"):
+    with pytest.raises(BIDMCPatientIdentityError, match="Patient grouping is incomplete"):
         server._run_bidmc_feature_export("fixture-job", request, lambda *_: None)
