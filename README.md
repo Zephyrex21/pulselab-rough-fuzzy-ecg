@@ -112,6 +112,7 @@ Project guides, methodology, implementation notes, import guides, changelog and 
 - [Patient-grouped BIDMC baseline evaluator](tools/evaluate_bidmc_baselines.py)
 - [Manual MIT-BIH retraining workflow guide](docs/reproducibility/MITBIH_RETRAINING.md)
 - [MIT-BIH run validator and artifact packager](tools/package_mitbih_run.py)
+- [MIT-BIH package recovery workflow](.github/workflows/recover-mitbih-package.yml)
 
 ```text
 .
