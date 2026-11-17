@@ -22,6 +22,8 @@ The run manifest records the source commit and 0.6.0 training source. The suppli
 
 Uploaded-signal inference now requires an explicit `inference_pipeline_contract` in the run manifest. The contract records the feature-schema, preprocessing, segmentation, feature-extraction, sampling/filter settings and R-peak detector versions used for training. Legacy exports without this contract, exports with a different contract, and annotation-guided benchmark runs are not offered for uploaded-signal inference. Their historical metrics and research reports remain available. Re-run the patient-disjoint experiment with automatic R-peak detection to generate an eligible model export.
 
+Newly trained model artifacts include a `model_artifact_sha256` value in the run manifest. Saved-model discovery and upload inference verify the file against that checksum before use. The SHA-256 values for the four Joblib files in the supplied historical export are also recorded in `docs/reproducibility/mitbih_training_environment.json`.
+
 IMPORTANT
 - Do not rename the run folder; the manifest contains relative paths into it.
 - Only load Joblib files from trusted sources.
