@@ -1,3 +1,10 @@
+## Unreleased — reproducible MIT-BIH retraining workflow
+
+- Added a manually triggered GitHub Actions workflow for the complete patient-disjoint MIT-BIH experiment using automatic R-peak detection and the pinned model runtime.
+- Added a strict run packager that validates the 22/21 record split, patient isolation, current input-pipeline contract, complete 43-record dataset provenance, complete R-peak diagnostics and saved-model SHA-256 checksums before creating a ZIP.
+- Packaged bundles include model/experiment artifacts, source and dataset file hashes, Python/package versions, and an installation/interpretation guide. The PhysioNet dataset itself is not redistributed.
+- Added regression tests for valid packaging, tampered model checksums and annotation-guided run rejection.
+
 ## Unreleased — patient identity and artifact integrity safeguards
 
 **BIDMC patient grouping**
