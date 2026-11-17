@@ -79,7 +79,7 @@ Open the MIT-BIH ECG workspace to inspect dataset status, launch experiments, vi
 4. Use the trained ECG + PPG or PPG-only estimator to generate window-level respiratory-rate estimates.
 5. Use the held-out report—not retrospective record replay—to assess generalization.
 
-The BIDMC loader reads patient identifiers from accompanying WFDB headers when available. If a CSV-only copy does not provide a subject ID, it uses an explicit record-level fallback identifier rather than guessing. Confirm subject grouping from the included manifest before making patient-disjoint evaluation claims.
+The BIDMC loader reads MIMIC-II patient identifiers from accompanying WFDB headers. `/api/bidmc/status` distinguishes verified patient IDs from missing, unreadable or ambiguous headers; record-level fallback IDs are never presented as patient IDs. Patient-disjoint feature exports are blocked unless every indexed recording has a verified subject ID. The installed BIDMC model status also checks the saved 36/10 split against the locally verified record-to-patient mapping when the dataset is present.
 
 ## API overview
 
