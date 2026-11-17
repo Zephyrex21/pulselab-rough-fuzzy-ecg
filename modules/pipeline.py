@@ -16,6 +16,7 @@ import pandas as pd
 import config
 from modules import baseline_models, calibration, data_loader, explainability, feature_extraction
 from modules.feature_schema import FEATURE_SCHEMA_VERSION, feature_names as canonical_feature_names
+from modules.pipeline_contract import current_mitbih_inference_contract
 from modules.hybrid_model import FuzzyOnlyModel, HybridRoughFuzzy
 from modules.metrics import (
     align_class_scores, evaluate_predictions, per_class_frame,
@@ -634,6 +635,14 @@ def run_experiment(
         "test_record_ids": test_ids,
         "sampling_frequency_hz": config.FS,
         "feature_schema_version": FEATURE_SCHEMA_VERSION,
+        "inference_pipeline_contract": (
+            current_mitbih_inference_contract()
+            if feature_builder is feature_extraction.build_record_features else None
+        ),
+        "inference_pipeline_contract_note": (
+            None if feature_builder is feature_extraction.build_record_features
+            else "A custom feature builder was supplied; uploaded-signal inference compatibility was not asserted."
+        ),
         "split_policy": split_protocol,
         "patient_disjoint": len({config.patient_id_for_record(r) for r in train_ids} & {config.patient_id_for_record(r) for r in test_ids}) == 0,
         "peak_source": peak_source,

@@ -13,7 +13,7 @@ PulseLab is an academic research prototype with **two independent, real-data res
 - Patient-disjoint evaluation, reproducible experiment manifests and Python model inference.
 - The supplied four-model training export and its reports are included under `models/` and `experiments/`.
 
-**Model compatibility note:** the supplied November 14, 2026 training export was produced with source version 0.6.0. PulseLab 0.7.0 uses the adaptive R-peak detector introduced in 0.6.1. Because this changes feature generation, the supplied metrics describe the historical run; retrain MIT-BIH models with the current detector before treating the shipped model as a fully matched preprocessing/model pair.
+**Model compatibility note:** the supplied November 14, 2026 training export was produced with source version 0.6.0. PulseLab 0.7.0 uses the adaptive R-peak detector introduced in 0.6.1. Because this changes feature generation, the supplied metrics describe the historical run; retrain MIT-BIH models with the current detector before treating the shipped model as a fully matched preprocessing/model pair. Legacy MIT-BIH model exports without a matching `inference_pipeline_contract` (or trained using annotation-guided peaks) are intentionally excluded from uploaded-signal inference; their saved research reports remain available.
 
 ### 2. BIDMC — multimodal cardiorespiratory research
 

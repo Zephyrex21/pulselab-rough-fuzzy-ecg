@@ -4,6 +4,10 @@ import numpy as np
 from scipy import signal as sps
 
 
+# Bump whenever R-peak detection behaviour or default parameters change.
+RPEAK_DETECTOR_VERSION = "adaptive-local-threshold-v1"
+
+
 def detect_rpeaks(
     x,
     fs,

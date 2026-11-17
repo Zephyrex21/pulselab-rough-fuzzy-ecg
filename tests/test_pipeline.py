@@ -180,6 +180,8 @@ def test_full_record_pipeline_wires_detected_peak_diagnostics_and_reports(tmp_pa
     detection = json.loads((output / "rpeak_detection_metrics.json").read_text(encoding="utf-8"))
 
     assert manifest["metadata"]["peak_source"] == "detected"
+    assert manifest["metadata"]["inference_pipeline_contract"] is None
+    assert "custom feature builder" in manifest["metadata"]["inference_pipeline_contract_note"]
     assert manifest["metadata"]["classification_evaluation"] == "conditional_on_matched_detected_beats"
     assert manifest["metadata"]["patient_disjoint"] is True
     assert len(manifest["train_records"]) == 2
@@ -190,3 +192,44 @@ def test_full_record_pipeline_wires_detected_peak_diagnostics_and_reports(tmp_pa
     assert (output / "rpeak_detection_per_record.csv").exists()
     assert (output / "test_predictions.csv").exists()
     assert "conditional on detected" in (output / "research_report.md").read_text(encoding="utf-8").lower()
+
+
+def test_default_record_pipeline_stamps_current_inference_compatibility_contract(tmp_path, monkeypatch):
+    from types import SimpleNamespace
+    from modules import feature_extraction, rpeak_detection
+    from modules.pipeline import run_experiment
+    from modules.pipeline_contract import current_mitbih_inference_contract
+
+    fs = 360
+    peaks = np.arange(300, 300 + 100 * fs, fs, dtype=int)
+    samples = int(peaks[-1] + 300)
+    rng = np.random.default_rng(123)
+    base_signal = rng.normal(0.0, 0.01, samples)
+    for peak in peaks:
+        base_signal[peak - 2:peak + 3] += np.asarray([0.15, 0.55, 1.0, 0.55, 0.15])
+    labels = np.asarray(["N" if index % 2 == 0 else "V" for index in range(len(peaks))])
+
+    def fake_loader(record_id, data_dir=None):
+        return SimpleNamespace(
+            record_id=str(record_id), fs=float(fs),
+            signal=np.column_stack([base_signal, base_signal * 0.75]),
+            ann_samples=peaks.copy(), ann_symbols=labels.copy(), ann_classes=labels.copy(),
+        )
+
+    monkeypatch.setattr(rpeak_detection, "detect_rpeaks", lambda signal, sampling_rate: peaks.copy())
+
+    class WaveletStub:
+        @staticmethod
+        def wavedec(values, wavelet, level, axis):
+            return np.array_split(values, level + 1, axis=axis)
+
+    monkeypatch.setattr(feature_extraction, "pywt", WaveletStub())
+    output = run_experiment(
+        ["100", "101"], ["103", "105"],
+        output_root=tmp_path / "experiments", include_baselines=False,
+        save_models=False, run_name="contract-stamp-check",
+        record_loader=fake_loader, peak_source="detected",
+    )
+    manifest = json.loads((output / "run_manifest.json").read_text(encoding="utf-8"))
+    assert manifest["metadata"]["peak_source"] == "detected"
+    assert manifest["metadata"]["inference_pipeline_contract"] == current_mitbih_inference_contract()

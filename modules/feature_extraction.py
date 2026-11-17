@@ -16,6 +16,9 @@ from config import FS, get_logger
 from modules.feature_schema import RR_FEATURES, CHANNEL_FEATURES as CH_FEATURES, feature_names, feature_domain
 from modules import preprocessing as pp, rpeak_detection as rd, segmentation as sg
 
+# Bump whenever RR, morphology, spectral or wavelet features change.
+FEATURE_EXTRACTION_VERSION = "mitdb-beat-features-v1"
+
 log = get_logger("features")
 
 GROUPS = {"RR / rhythm": RR_FEATURES}
