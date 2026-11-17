@@ -108,6 +108,8 @@ Project guides, methodology, implementation notes, import guides, changelog and 
 - [MIT-BIH artifact and compatibility guide](docs/import-guides/MIT_BIH_MODEL_ARTIFACTS.md)
 - [BIDMC artifact and training guide](docs/import-guides/BIDMC_MODEL_ARTIFACTS.md)
 - [Training provenance files](docs/reproducibility/)
+- [BIDMC baseline screen and candidate evaluation](docs/reproducibility/BIDMC_BASELINE_SCREEN_20261117.md)
+- [Patient-grouped BIDMC baseline evaluator](tools/evaluate_bidmc_baselines.py)
 
 ```text
 .
