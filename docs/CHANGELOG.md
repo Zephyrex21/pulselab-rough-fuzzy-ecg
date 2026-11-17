@@ -1,3 +1,9 @@
+## Unreleased — MIT-BIH package import fix and recovery
+
+- Fixed repository-root import resolution in the MIT-BIH packager and switched the training workflow to module invocation.
+- Added a direct-script regression test to prevent `ModuleNotFoundError: config` when the packager is executed from `tools/`.
+- Added a recovery workflow that reuses an existing successful training run's model/report artifact and downloads the required WFDB records for packaging without repeating training.
+
 ## Unreleased — reproducible MIT-BIH retraining workflow
 
 - Added a manually triggered GitHub Actions workflow for the complete patient-disjoint MIT-BIH experiment using automatic R-peak detection and the pinned model runtime.
