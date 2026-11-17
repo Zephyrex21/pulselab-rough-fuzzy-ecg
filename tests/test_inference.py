@@ -7,6 +7,7 @@ import pytest
 
 from modules import inference
 from modules.feature_schema import FEATURE_SCHEMA_VERSION, feature_names
+from modules.pipeline_contract import current_mitbih_inference_contract
 
 
 class FixtureSavedModel:
@@ -57,6 +58,7 @@ def _make_saved_run(tmp_path: Path):
             "peak_source": "detected",
             "split_policy": "patient-disjoint",
             "patient_disjoint": True,
+            "inference_pipeline_contract": current_mitbih_inference_contract(),
         },
         "score_interpretation": {"Fixture model": "fixture ranking scores"},
         "metrics": {"Fixture model": {
@@ -180,4 +182,40 @@ def test_model_resolution_rejects_arbitrary_model_paths(tmp_path):
     manifest["metrics"]["Fixture model"]["model_artifact"] = "../../secrets.joblib"
     manifest_path.write_text(json.dumps(manifest))
     with pytest.raises(inference.InferenceError):
+        inference.get_saved_model_entry(run_id, "Fixture model", experiments, project, models)
+
+
+def test_legacy_model_without_pipeline_contract_is_not_discovered_or_loadable(tmp_path):
+    experiments, project, models, run_id, _ = _make_saved_run(tmp_path)
+    manifest_path = experiments / run_id / "run_manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["metadata"].pop("inference_pipeline_contract")
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+    assert inference.discover_saved_models(experiments, project, models) == []
+    with pytest.raises(inference.InferenceError, match="does not record an inference-pipeline compatibility contract"):
+        inference.get_saved_model_entry(run_id, "Fixture model", experiments, project, models)
+
+
+def test_model_with_different_rpeak_detector_version_is_not_compatible(tmp_path):
+    experiments, project, models, run_id, _ = _make_saved_run(tmp_path)
+    manifest_path = experiments / run_id / "run_manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["metadata"]["inference_pipeline_contract"]["rpeak_detector_version"] = "global-percentile-threshold-v1"
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+    assert inference.discover_saved_models(experiments, project, models) == []
+    with pytest.raises(inference.InferenceError, match="different MIT-BIH input pipeline"):
+        inference.get_saved_model_entry(run_id, "Fixture model", experiments, project, models)
+
+
+def test_annotation_guided_model_is_not_discovered_for_uploaded_signal_inference(tmp_path):
+    experiments, project, models, run_id, _ = _make_saved_run(tmp_path)
+    manifest_path = experiments / run_id / "run_manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["metadata"]["peak_source"] = "annotations"
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+    assert inference.discover_saved_models(experiments, project, models) == []
+    with pytest.raises(inference.InferenceError, match="annotation-guided runs are benchmark-only"):
         inference.get_saved_model_entry(run_id, "Fixture model", experiments, project, models)
