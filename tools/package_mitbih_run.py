@@ -16,6 +16,14 @@ import subprocess
 import zipfile
 from pathlib import Path
 from typing import Any
+import sys
+
+# Executing "python tools/package_mitbih_run.py" sets sys.path[0] to the
+# tools/ directory, not the repository root. Bootstrap the root before
+# importing the project modules so both direct-script and -m invocation work.
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
 
 import config
 from modules.pipeline_contract import check_mitbih_inference_compatibility
