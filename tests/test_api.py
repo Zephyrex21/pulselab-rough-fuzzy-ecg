@@ -381,3 +381,20 @@ def test_bidmc_preview_rejects_missing_record(tmp_path, monkeypatch):
         response = client.get("/api/bidmc/records/bidmc01/preview")
     assert response.status_code == 400
     assert "BIDMC dataset not found" in response.json()["detail"]
+
+
+def test_frontend_result_summaries_are_in_app_not_raw_json_tabs():
+    root = server.WEB_DIR
+    index = (root / "index.html").read_text(encoding="utf-8")
+    script = (root / "app.js").read_text(encoding="utf-8")
+    styles = (root / "styles.css").read_text(encoding="utf-8")
+    assert 'id="result-dialog"' in index
+    assert "renderExperimentSummary" in script
+    assert "renderInferenceSummary" in script
+    assert "markdownReportToHtml" in script
+    assert "state.prediction=null" in script
+    assert 'target="_blank"' not in script
+    assert 'class="nav-label"' in script
+    assert "body.sidebar-collapsed .nav-label" in styles
+    assert "result-dialog" in styles
+

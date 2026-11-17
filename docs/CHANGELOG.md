@@ -36,6 +36,14 @@
 - Clearly labels final-model record replay as retrospective/in-sample; held-out results remain the source of generalization metrics.
 - Documented the modest held-out performance and its limited difference from the median baseline.
 
+**Post-integration UI and API-consumption polish (same 0.7.0 model compatibility)**
+- Fixed the collapsible sidebar navigation labels: labels now fully hide in the icon rail, retain accessible names/tooltips, and no longer squeeze into the reduced width. Collapse state is remembered locally and can be toggled with Ctrl+B on desktop.
+- Improved responsive workspace sizing and control wrapping for collapsed desktop, compact desktop and mobile layouts.
+- Replaced new-tab raw JSON summary links with structured in-app experiment and inference result dialogs; added a readable in-app BIDMC research-report viewer. Explicit artifact links remain downloads.
+- Clear prior BIDMC preview/prediction output when the selected record or estimator changes, preventing stale results from appearing under a new selection.
+- Added guards for optional MIT-BIH refresh controls and regression coverage for the result viewer/sidebar behavior.
+- Kept VERSION at 0.7.0 so the UI-only patch does not alter the trained artifact provenance or runtime compatibility contract.
+
 ## 0.6.1 — Bug-fix and UI pass
 
 **Signal processing**
