@@ -69,5 +69,8 @@ jobs:
         run: |
           node --check web/app.js
 
+      - name: Test report Markdown and CSV rendering
+        run: node tests/report_markdown.test.js
+
       - name: Verify removed simulator is not loaded
         run: '! grep -Eq "core\.js|SIMULATED DATA|synthetic browser" web/index.html web/app.js'
