@@ -45,7 +45,7 @@ jobs:
 
       - name: Compile Python sources
         run: |
-          python -m compileall -q app.py server.py config.py train.py audit_dataset.py validate_rpeaks.py modules tests
+          python -m compileall -q app.py server.py config.py train.py audit_dataset.py validate_rpeaks.py modules tests tools
 
       - name: Run Python test suite
         run: python -m pytest -q
