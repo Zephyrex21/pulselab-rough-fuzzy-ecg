@@ -110,6 +110,8 @@ Project guides, methodology, implementation notes, import guides, changelog and 
 - [Training provenance files](docs/reproducibility/)
 - [BIDMC baseline screen and candidate evaluation](docs/reproducibility/BIDMC_BASELINE_SCREEN_20261117.md)
 - [Patient-grouped BIDMC baseline evaluator](tools/evaluate_bidmc_baselines.py)
+- [Manual MIT-BIH retraining workflow guide](docs/reproducibility/MITBIH_RETRAINING.md)
+- [MIT-BIH run validator and artifact packager](tools/package_mitbih_run.py)
 
 ```text
 .
