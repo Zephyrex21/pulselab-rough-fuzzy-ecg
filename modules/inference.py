@@ -25,6 +25,7 @@ import pandas as pd
 import config
 from modules import calibration, explainability, feature_extraction
 from modules.feature_schema import FEATURE_SCHEMA_VERSION
+from modules.pipeline_contract import check_mitbih_inference_compatibility
 
 RUN_ID_RE = re.compile(r"^[A-Za-z0-9_.-]{1,100}$")
 INFERENCE_ID_RE = re.compile(r"^inference_[A-Za-z0-9_.-]{1,120}$")
@@ -179,6 +180,9 @@ def discover_saved_models(
                 continue
             if manifest.get("feature_schema_version") != FEATURE_SCHEMA_VERSION:
                 continue
+            compatible, _reason = check_mitbih_inference_compatibility(manifest)
+            if not compatible:
+                continue
             feature_columns = manifest.get("feature_columns") or []
             channel_count = _expected_channel_count(feature_columns)
             metrics = manifest.get("metrics") or {}
@@ -203,6 +207,7 @@ def discover_saved_models(
                     "split_protocol": metadata.get("split_policy"),
                     "patient_disjoint": metadata.get("patient_disjoint"),
                     "feature_schema_version": manifest.get("feature_schema_version"),
+                    "inference_pipeline_contract": (metadata.get("inference_pipeline_contract") or {}).copy(),
                     "score_interpretation": (manifest.get("score_interpretation") or {}).get(model_name, "model score"),
                     "score_temperature": float(((model_metrics or {}).get("score_calibration") or {}).get("temperature", (model_metrics or {}).get("score_temperature", 1.0))),
                     "calibration_status": ((model_metrics or {}).get("score_calibration") or {}).get("status", "not_available"),
@@ -236,6 +241,9 @@ def get_saved_model_entry(
         raise InferenceError("Only models trained by the MIT-BIH research pipeline are available for uploaded-signal inference.")
     if manifest.get("feature_schema_version") != FEATURE_SCHEMA_VERSION:
         raise InferenceError("The selected model uses an unsupported feature schema. Retrain it with the current PulseLab pipeline.")
+    compatible, compatibility_reason = check_mitbih_inference_compatibility(manifest)
+    if not compatible:
+        raise InferenceError(compatibility_reason or "The selected model is incompatible with the current MIT-BIH inference pipeline. Retrain it before use.")
     model_metrics = (manifest.get("metrics") or {}).get(model_name)
     if not isinstance(model_metrics, dict) or not model_metrics.get("model_artifact"):
         raise InferenceError("No saved artifact was found for this model. Re-run the experiment with model saving enabled.")
