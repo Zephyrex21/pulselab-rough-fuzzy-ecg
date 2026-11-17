@@ -1,3 +1,19 @@
+## Unreleased — patient identity and artifact integrity safeguards
+
+**BIDMC patient grouping**
+- Added a strict patient-identity audit that parses MIMIC-II subject IDs from WFDB headers and distinguishes verified IDs from missing, unreadable, unparseable or ambiguous headers.
+- BIDMC status no longer presents record-specific fallback identifiers as patient IDs; verified patient-group counts are displayed separately.
+- Patient-disjoint feature exports now fail closed unless every indexed recording has a verified subject ID.
+- Saved BIDMC training/test patient and record assignments can be checked against the locally verified 53-record / 46-patient mapping.
+
+**Artifact integrity**
+- Added trusted SHA-256 checksums for both supplied BIDMC Joblib estimators and all allow-listed model/evaluation reports; the loader verifies files before deserializing models.
+- New MIT-BIH model exports record a SHA-256 checksum per serialized model. Model discovery and upload inference reject missing or mismatched checksums.
+
+**Evaluation**
+- Re-evaluated conventional regression baselines using the existing BIDMC feature export and the original patient-disjoint 36/10 split. No new candidate materially outperformed the existing PPG-only Rough-Fuzzy estimator and median baseline; no replacement model was promoted.
+- The supplied November 14 MIT-BIH model bundle remains historical and incompatible with the current automatic R-peak detector. The November 17 model artifacts shown in the UI were not present in the supplied artifact ZIP, so those screenshot metrics remain unverified.
+
 # Changelog
 
 ## 0.7.0 — Dual real-data research engines
