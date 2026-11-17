@@ -155,7 +155,7 @@
       }
 
       if (line.trim().startsWith('|') && index + 1 < lines.length && isPipeTableSeparator(lines[index + 1])) {
-        flushParawraph();
+        flushParagraph();
         flushList();
         const header = parsePipeRow(line);
         const rows = [];
@@ -183,7 +183,7 @@
         continue;
       }
       if (bullet || ordered) {
-        flushParawraph();
+        flushParagraph();
         const nextType = ordered ? 'ol' : 'ul';
         if (listType && listType !== nextType) flushList();
         listType = nextType;
