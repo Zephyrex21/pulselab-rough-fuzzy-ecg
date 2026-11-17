@@ -1,5 +1,7 @@
 import hashlib
 import json
+import subprocess
+import sys
 from pathlib import Path
 import zipfile
 
@@ -118,3 +120,17 @@ def test_package_mitbih_run_rejects_annotation_guided_manifest(tmp_path):
 
     with pytest.raises(PackageValidationError, match="automatic R-peak"):
         validate_and_package(root, run_id, tmp_path / "dist")
+
+
+def test_packager_direct_script_bootstraps_repository_root(tmp_path):
+    project_root = Path(__file__).resolve().parents[1]
+    script = project_root / "tools" / "package_mitbih_run.py"
+    result = subprocess.run(
+        [sys.executable, str(script), "--help"],
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr
+    assert "Validate and package" in result.stdout
