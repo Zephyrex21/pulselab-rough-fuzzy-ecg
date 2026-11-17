@@ -147,6 +147,25 @@ def installed_test_artifacts(tmp_path, monkeypatch):
     comparison.to_csv(experiment_dir / "model_comparison.csv", index=False)
     agreement = {"mean_absolute_annotator_difference_bpm": 1.2, "within_2_bpm_fraction": 0.8}
     (experiment_dir / "annotation_agreement.json").write_text(json.dumps(agreement), encoding="utf-8")
+    (experiment_dir / "research_report.md").write_text("# Test BIDMC report\\n", encoding="utf-8")
+    pd.DataFrame([{"patient_id": "test_00", "patient_MAE_bpm": 1.0}]).to_csv(
+        experiment_dir / "per_patient_metrics.csv", index=False
+    )
+    pd.DataFrame([{"record_id": "bidmc01", "prediction_rr_bpm": 18.0}]).to_csv(
+        experiment_dir / "test_predictions.csv", index=False
+    )
+
+    artifact_hashes = {}
+    for filename in bidmc_inference.MODEL_FILES.values():
+        relative = f"models/{bidmc_inference.BIDMC_RUN_ID}/{filename}"
+        artifact_hashes[relative] = hashlib.sha256((model_dir / filename).read_bytes()).hexdigest()
+    for filename in bidmc_inference.ARTIFACT_FILES:
+        relative = f"experiments/{bidmc_inference.BIDMC_RUN_ID}/{filename}"
+        artifact_hashes[relative] = hashlib.sha256((experiment_dir / filename).read_bytes()).hexdigest()
+    environment["artifact_sha256"] = artifact_hashes
+    (reproducibility_dir / "bidmc_training_environment.json").write_text(
+        json.dumps(environment), encoding="utf-8"
+    )
 
     monkeypatch.setattr(config, "ROOT", project_root)
     monkeypatch.setattr(config, "MODELS_DIR", models_root)
@@ -163,6 +182,8 @@ def test_bidmc_trained_registry_verifies_source_and_loads_both_estimators(instal
     )
     assert registry["available"] is True
     assert registry["source_hashes_verified"] is True
+    assert registry["artifact_hashes_verified"] is True
+    assert registry["verified_artifact_count"] == len(bidmc_inference.MODEL_FILES) + len(bidmc_inference.ARTIFACT_FILES)
     assert registry["run_id"] == bidmc_inference.BIDMC_RUN_ID
     assert set(registry["models_loaded"]) == {"ecg_ppg", "ppg_only"}
     assert registry["models"]["ecg_ppg"]["input_feature_count"] == 32
@@ -229,3 +250,15 @@ def test_bidmc_registry_fails_closed_if_a_required_model_is_missing(installed_te
     missing_model.unlink()
     with pytest.raises(bidmc_inference.BIDMCArtifactError, match="artifacts are incomplete"):
         bidmc_inference.load_trained_registry(config.ROOT, config.MODELS_DIR, config.EXPERIMENTS_DIR)
+
+
+def test_bidmc_registry_rejects_tampered_model_or_report_artifacts(installed_test_artifacts):
+    model_path = (
+        config.MODELS_DIR / bidmc_inference.BIDMC_RUN_ID
+        / bidmc_inference.MODEL_FILES["ecg_ppg"]
+    )
+    model_path.write_bytes(model_path.read_bytes() + b"tampered")
+    with pytest.raises(bidmc_inference.BIDMCArtifactError, match="artifact integrity check failed"):
+        bidmc_inference.load_trained_registry(
+            config.ROOT, config.MODELS_DIR, config.EXPERIMENTS_DIR
+        )
