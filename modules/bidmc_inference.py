@@ -63,7 +63,7 @@ def load_trained_registry(project_root: str | Path, models_root: str | Path, exp
     experiments_root = Path(experiments_root).resolve()
     model_dir = models_root / BIDMC_RUN_ID
     experiment_dir = experiments_root / BIDMC_RUN_ID
-    env_path = project_root / "pulselab_bidmc_training_environment.json"
+    env_path = project_root / "docs" / "reproducibility" / "bidmc_training_environment.json"
     manifest_path = experiment_dir / "run_manifest.json"
     comparison_path = experiment_dir / "model_comparison.csv"
     agreement_path = experiment_dir / "annotation_agreement.json"

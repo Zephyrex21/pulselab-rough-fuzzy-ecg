@@ -2,6 +2,11 @@
 
 ## 0.7.0 — Dual real-data research engines
 
+**Repository organization**
+- Consolidated architecture, methodology, implementation notes, changelog, model-import guides and training provenance under `docs/`.
+- Moved pinned model-runtime dependency sets into `requirements/`, leaving only the main `README.md` and primary `requirements.txt` at the repository root.
+- Updated the BIDMC inference loader and setup documentation to use the reorganized provenance and runtime-requirements paths.
+
 **Browser application**
 - Removed the browser-only synthetic ECG generator, simulated waveform renderer, browser-side model training and simulated prediction path.
 - Rebuilt the web interface as an API client for the Python research engines.

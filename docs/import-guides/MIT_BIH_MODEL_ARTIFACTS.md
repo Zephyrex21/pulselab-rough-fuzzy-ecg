@@ -5,8 +5,8 @@ Source repository commit recorded by the run: 0bb5d33755c90616fa1b89a0a4835dae68
 CONTENTS IN THIS PROJECT
 - models/pulselab_patient_disjoint_detected_20261114T053618Z_5383/          Four saved Joblib model files
 - experiments/pulselab_patient_disjoint_detected_20261114T053618Z_5383/    Run manifest, metrics, predictions, reports and diagnostics
-- pulselab_model_runtime_requirements.txt                                  Key package versions used in Kaggle
-- pulselab_training_environment.json                                      Python and package version record
+- requirements/mitbih-model-runtime.txt                                  Key package versions used in Kaggle
+- docs/reproducibility/mitbih_training_environment.json                                      Python and package version record
 
 CURRENT PROJECT
 These files are already placed in PulseLab 0.7.0. No separate import or copy step is needed.
