@@ -6,6 +6,10 @@ from scipy import signal as sps
 from config import BANDPASS, BASELINE_MEDIAN_WINDOWS, NOTCH_HZ, FS
 
 
+# Bump whenever signal cleaning, filtering, resampling or amplitude normalisation changes.
+PREPROCESSING_VERSION = "mitdb-signal-preprocessing-v1"
+
+
 def resample_to(x: np.ndarray, fs_in: float, fs_out: float = FS) -> np.ndarray:
     if abs(fs_in - fs_out) < 1e-6:
         return x
