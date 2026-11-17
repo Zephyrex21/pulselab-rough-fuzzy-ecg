@@ -20,6 +20,8 @@ RUN LOCALLY
 COMPATIBILITY NOTE
 The run manifest records the source commit and 0.6.0 training source. The supplied project uses the adaptive R-peak detector introduced in 0.6.1. The detector change affects the feature-generation path, so treat the supplied metrics as historical results for that training run. Re-train MIT-BIH models with the current source before relying on inference as a matched model/preprocessing pair.
 
+Uploaded-signal inference now requires an explicit `inference_pipeline_contract` in the run manifest. The contract records the feature-schema, preprocessing, segmentation, feature-extraction, sampling/filter settings and R-peak detector versions used for training. Legacy exports without this contract, exports with a different contract, and annotation-guided benchmark runs are not offered for uploaded-signal inference. Their historical metrics and research reports remain available. Re-run the patient-disjoint experiment with automatic R-peak detection to generate an eligible model export.
+
 IMPORTANT
 - Do not rename the run folder; the manifest contains relative paths into it.
 - Only load Joblib files from trusted sources.
