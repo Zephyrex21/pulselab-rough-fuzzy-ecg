@@ -16,10 +16,10 @@ def _write_record(root: Path, record_number: int, patient_id: str | None):
     csv_dir = root / "bidmc_csv"
     csv_dir.mkdir(parents=True, exist_ok=True)
     record = f"bidmc{record_number:02d}"
-    (csv_dir / f"{record}_Signals.csv").write_text(
+    (csv_dir / f"bidmc_{record_number:02d}_Signals.csv").write_text(
         "Time [s], II, PLETH, RESP\n0, 0.1, 0.2, 0.3\n", encoding="utf-8"
     )
-    (csv_dir / f"{record}_Breaths.csv").write_text(
+    (csv_dir / f"bidmc_{record_number:02d}_Breaths.csv").write_text(
         "breath_idx,ann1,ann2\n0,0,0\n", encoding="utf-8"
     )
     if patient_id is not None:
