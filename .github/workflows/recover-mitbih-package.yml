@@ -1,0 +1,110 @@
+name: Recover MIT-BIH model package
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_run_id:
+        description: "Successful MIT-BIH training workflow run ID to package"
+        required: true
+        type: string
+        default: "44143473651"
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: mitbih-package-recovery
+  cancel-in-progress: false
+
+jobs:
+  package:
+    name: Repackage an existing trained MIT-BIH run
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+
+    steps:
+      - name: Check out current compatible source
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Set up pinned training Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.13.18"
+          cache: pip
+          cache-dependency-path: requirements/mitbih-model-runtime.txt
+
+      - name: Install exact model runtime
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements/mitbih-model-runtime.txt
+
+      - name: Validate source run ID and derive artifact name
+        id: source
+        env:
+          SOURCE_RUN_ID: ${{ inputs.source_run_id }}
+        shell: bash
+        run: |
+          if [[ ! "$SOURCE_RUN_ID" =~ ^[0-9]+$ ]]; then
+            echo "source_run_id must contain only digits." >&2
+            exit 1
+          fi
+          echo "run_name=pulselab_patient_disjoint_adaptive_${SOURCE_RUN_ID}" >> "$GITHUB_OUTPUT"
+          echo "artifact_name=pulselab-mitbih-pulselab_patient_disjoint_adaptive_${SOURCE_RUN_ID}" >> "$GITHUB_OUTPUT"
+
+      - name: Download the existing model and report artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ steps.source.outputs.artifact_name }}
+          run-id: ${{ inputs.source_run_id }}
+          repository: ${{ github.repository }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: recovery-source
+
+      - name: Restore the already-trained models and reports
+        env:
+          RUN_NAME: ${{ steps.source.outputs.run_name }}
+        shell: bash
+        run: |
+          test -d "recovery-source/experiments/$RUN_NAME"
+          test -d "recovery-source/models/$RUN_NAME"
+          mkdir -p experiments models
+          cp -a "recovery-source/experiments/$RUN_NAME" experiments/
+          cp -a "recovery-source/models/$RUN_NAME" models/
+
+      - name: Download the exact MIT-BIH records for provenance hashes
+        run: |
+          python - <<'PY'
+          import config
+          from modules import data_loader
+
+          train_records, test_records = config.get_record_split("patient-disjoint")
+          requested = list(map(str, train_records + test_records))
+          available = set(data_loader.download_records(requested, data_dir=config.DATA_DIR))
+          missing = sorted(set(requested) - available, key=int)
+          if missing:
+              raise SystemExit(f"Could not download all required MIT-BIH records for packaging: {missing}")
+          print(f"Verified {len(available)} required WFDB records for packaging.")
+          PY
+
+      - name: Validate and package the existing trained run
+        env:
+          RUN_NAME: ${{ steps.source.outputs.run_name }}
+        run: |
+          python -m tools.package_mitbih_run \
+            --run-id "$RUN_NAME" \
+            --project-root . \
+            --output-dir dist
+
+      - name: Upload the recovered verified model bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: pulselab-mitbih-recovered-${{ steps.source.outputs.run_name }}
+          path: |
+            dist/PulseLab_MITBIH_${{ steps.source.outputs.run_name }}.zip
+            experiments/${{ steps.source.outputs.run_name }}/
+            models/${{ steps.source.outputs.run_name }}/
+          if-no-files-found: error
+          retention-days: 60

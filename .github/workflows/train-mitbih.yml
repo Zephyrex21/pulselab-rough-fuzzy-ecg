@@ -58,7 +58,7 @@ jobs:
         env:
           RUN_NAME: ${{ steps.run.outputs.run_name }}
         run: |
-          python tools/package_mitbih_run.py \
+          python -m tools.package_mitbih_run \
             --run-id "$RUN_NAME" \
             --project-root . \
             --output-dir dist
