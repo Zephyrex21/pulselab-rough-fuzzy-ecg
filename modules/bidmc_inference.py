@@ -140,6 +140,10 @@ def load_trained_registry(project_root: str | Path, models_root: str | Path, exp
         "predictor_policy": manifest.get("predictor_policy", "PPG-only or ECG+PPG; RESP-derived predictors excluded."),
         "n_train_patients": len(manifest.get("train_patient_ids", [])),
         "n_test_patients": len(manifest.get("test_patient_ids", [])),
+        "train_patient_ids": list(map(str, manifest.get("train_patient_ids", []))),
+        "test_patient_ids": list(map(str, manifest.get("test_patient_ids", []))),
+        "train_records": list(map(str, manifest.get("train_records", []))),
+        "test_records": list(map(str, manifest.get("test_records", []))),
         "n_train_windows": max(0, labelled_windows - heldout_windows),
         "n_test_windows": heldout_windows,
         "models": {
