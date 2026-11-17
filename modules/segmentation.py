@@ -4,6 +4,10 @@ import numpy as np
 from config import PRE_R_SEC, POST_R_SEC
 
 
+# Bump whenever heartbeat window geometry or edge handling changes.
+SEGMENTATION_VERSION = "mitdb-centered-beat-window-v1"
+
+
 def beat_geometry(fs, pre=PRE_R_SEC, post=POST_R_SEC):
     pre_n, post_n = int(round(pre * fs)), int(round(post * fs))
     return pre_n, post_n, pre_n + post_n
