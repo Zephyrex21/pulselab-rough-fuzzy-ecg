@@ -13,7 +13,7 @@ from typing import Any
 
 from modules import bidmc_pipeline
 
-_PATIENT_ID_RE = re.compile(r"(?:matched/)?(s\\d{4,8})/", flags=re.IGNORECASE)
+_PATIENT_ID_RE = re.compile(r"(?:matched/)?(s\d{4,8})/", flags=re.IGNORECASE)
 
 
 class BIDMCPatientIdentityError(ValueError):
@@ -65,7 +65,7 @@ def audit_patient_identity(dataset_root: str | Path) -> dict[str, Any]:
 
     for record in records:
         record_id = str(record.get("record_id", ""))
-        match = re.fullmatch(r"bidmc(\\d{2})", record_id, flags=re.IGNORECASE)
+        match = re.fullmatch(r"bidmc(\d{2})", record_id, flags=re.IGNORECASE)
         if not match:
             patient_id, status = None, "invalid_record_id"
         else:
