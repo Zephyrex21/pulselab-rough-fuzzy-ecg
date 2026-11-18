@@ -10,7 +10,7 @@ The project includes a helper that reads your local `data/mitdb` WFDB files and 
 python tools/export_mitbih_demo_csv.py --max-records 5
 ```
 
-Files are written to `data/demo_ecg_csv/`. The default selection comes from the configured patient-disjoint test split, and the exporter refuses training-split records. It preserves the native 360 Hz sampling rate and first two recorded leads. In the upload form, set **Sampling frequency = 360 Hz**.
+Files are written to `data/demo_ecg_csv/`. The default selection comes from the configured patient-disjoint test split, and the exporter refuses training-split records. It exports a five-minute segment by default (configurable up to the 10-minute API limit), preserving the native 360 Hz sampling rate and first two recorded leads. In the upload form, set **Sampling frequency = 360 Hz**.
 
 You can choose specific held-out records too:
 
