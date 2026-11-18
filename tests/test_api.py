@@ -1,5 +1,6 @@
 """API integration tests for the Phase 4 local research service."""
 import hashlib
+import re
 from fastapi.testclient import TestClient
 
 import config
@@ -399,7 +400,9 @@ def test_frontend_result_summaries_are_in_app_not_raw_json_tabs():
     assert "renderInferenceSummary" in script
     assert "markdownReportToHtml" in script
     assert "state.prediction=null" in script
-    assert 'target="_blank"' not in script
+    external_links = re.findall(r'<a\\b[^>]*target="_blank"[^>]*>', script)
+    assert external_links
+    assert all('rel="noopener noreferrer"' in tag for tag in external_links)
     assert 'class="nav-label"' in script
     assert "body.sidebar-collapsed .nav-label" in styles
     assert "result-dialog" in styles
