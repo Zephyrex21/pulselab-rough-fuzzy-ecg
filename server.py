@@ -32,6 +32,37 @@ WEB_DIR = ROOT / "web"
 EXPERIMENTS_DIR = config.EXPERIMENTS_DIR
 logger = logging.getLogger("pulselab.api")
 
+# The legacy BIDMC value was calculated after load_record() interpolated missing
+# samples. It is therefore a post-interpolation finite-sample fraction, not a
+# signal-quality score (and must not be used as a proxy for noise or artefacts).
+BIDMC_POST_INTERPOLATION_FRACTION = "post_interpolation_finite_fraction"
+BIDMC_SIGNAL_QUALITY_NOTE = (
+    "Signal quality was not assessed. The reported post_interpolation_finite_fraction "
+    "is calculated after missing samples are interpolated; it describes finite values "
+    "after preprocessing only and does not measure original missingness, clipping, "
+    "flatlines, noise, or physiological signal quality."
+)
+
+
+def _rename_bidmc_quality_metadata_column(frame):
+    """Rename legacy post-interpolation metadata without changing model features."""
+    if frame is None or not hasattr(frame, "columns") or "window_quality" not in frame.columns:
+        return frame
+    return frame.rename(columns={"window_quality": BIDMC_POST_INTERPOLATION_FRACTION})
+
+
+def _clarify_bidmc_prediction_quality(result: dict) -> dict:
+    """Expose the legacy finite fraction honestly in API prediction metadata."""
+    for row in result.get("predictions", []):
+        if "window_quality" in row:
+            row[BIDMC_POST_INTERPOLATION_FRACTION] = row.pop("window_quality")
+    result["signal_quality_assessment"] = {
+        "status": "not_assessed",
+        "note": BIDMC_SIGNAL_QUALITY_NOTE,
+    }
+    return result
+
+
 app = FastAPI(
     title="PulseLab Research API",
     description=(
@@ -350,6 +381,10 @@ def _run_bidmc_feature_export(job_id: str, request: BIDMCFeatureExportRequest, p
         stride_sec=request.stride_sec,
         progress=lambda fraction, message: progress(0.05 + 0.82 * fraction, message),
     )
+    # This column was computed after load_record() interpolation. Keep its
+    # numerical value for backwards traceability, but never label it quality.
+    full = _rename_bidmc_quality_metadata_column(full)
+    rr_safe = _rename_bidmc_quality_metadata_column(rr_safe)
     export_id = "bidmc_features_" + datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ") + "_" + uuid4().hex[:6]
     output_dir = (EXPERIMENTS_DIR / "bidmc_feature_exports" / export_id).resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -380,7 +415,7 @@ def _run_bidmc_feature_export(job_id: str, request: BIDMCFeatureExportRequest, p
         "stride_sec": request.stride_sec,
         "n_windows": int(len(full)),
         "n_labelled_windows": int(full["ref_rr_mean_bpm"].notna().sum()) if not full.empty else 0,
-        "n_features_full_multimodal": int(len([c for c in full.columns if c not in {"record_id", "patient_id", "window_start_sec", "window_end_sec", "ref_rr_ann1_bpm", "ref_rr_ann2_bpm", "ref_rr_mean_bpm", "annotator_difference_bpm", "ann1_breath_count", "ann2_breath_count", "window_quality"}])),
+        "n_features_full_multimodal": int(len([c for c in full.columns if c not in {"record_id", "patient_id", "window_start_sec", "window_end_sec", "ref_rr_ann1_bpm", "ref_rr_ann2_bpm", "ref_rr_mean_bpm", "annotator_difference_bpm", "ann1_breath_count", "ann2_breath_count", BIDMC_POST_INTERPOLATION_FRACTION}])),
         "n_features_rr_estimation": int(len([c for c in rr_safe.columns if c not in {"record_id", "patient_id", "window_start_sec", "window_end_sec", "ref_rr_ann1_bpm", "ref_rr_ann2_bpm", "ref_rr_mean_bpm", "annotator_difference_bpm", "ann1_breath_count", "ann2_breath_count", "window_quality"}])),
         "files": [full_path.name, safe_path.name],
         "target_definition": "Median interval-based breaths/min independently derived from ann1 and ann2; ref_rr_mean_bpm is the mean of available annotator rates.",
@@ -388,6 +423,11 @@ def _run_bidmc_feature_export(job_id: str, request: BIDMCFeatureExportRequest, p
         "patient_grouping_note": "Only verified MIMIC-II subject IDs from WFDB headers are accepted for patient-disjoint feature exports. Record-level fallback identifiers are not valid patient IDs.",
         "model_status": "Trained patient-disjoint BIDMC Rough-Fuzzy models are installed; this feature export does not retrain them.",
         "trained_model_run_id": bidmc_inference.BIDMC_RUN_ID,
+        "signal_quality_assessment": {
+            "status": "not_assessed",
+            "metadata_column": BIDMC_POST_INTERPOLATION_FRACTION,
+            "note": BIDMC_SIGNAL_QUALITY_NOTE,
+        },
 
     }
     (output_dir / "feature_export_summary.json").write_text(json.dumps(_json_safe(summary), indent=2), encoding="utf-8")
@@ -490,6 +530,7 @@ def bidmc_record_predictions(record_id: str, model: Literal["ecg_ppg", "ppg_only
     try:
         record = bidmc_pipeline.load_record(record_id, config.BIDMC_DATA_DIR)
         result = bidmc_inference.predict_record(record, registry["models_loaded"], model)
+        result = _clarify_bidmc_prediction_quality(result)
         identity_audit = bidmc_identity.audit_patient_identity(config.BIDMC_DATA_DIR)
         verified_patient = (identity_audit.get("record_to_patient") or {}).get(record.record_id)
         result["patient_id"] = verified_patient
