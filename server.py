@@ -416,7 +416,7 @@ def _run_bidmc_feature_export(job_id: str, request: BIDMCFeatureExportRequest, p
         "n_windows": int(len(full)),
         "n_labelled_windows": int(full["ref_rr_mean_bpm"].notna().sum()) if not full.empty else 0,
         "n_features_full_multimodal": int(len([c for c in full.columns if c not in {"record_id", "patient_id", "window_start_sec", "window_end_sec", "ref_rr_ann1_bpm", "ref_rr_ann2_bpm", "ref_rr_mean_bpm", "annotator_difference_bpm", "ann1_breath_count", "ann2_breath_count", BIDMC_POST_INTERPOLATION_FRACTION}])),
-        "n_features_rr_estimation": int(len([c for c in rr_safe.columns if c not in {"record_id", "patient_id", "window_start_sec", "window_end_sec", "ref_rr_ann1_bpm", "ref_rr_ann2_bpm", "ref_rr_mean_bpm", "annotator_difference_bpm", "ann1_breath_count", "ann2_breath_count", "window_quality"}])),
+        "n_features_rr_estimation": int(len([c for c in rr_safe.columns if c not in {"record_id", "patient_id", "window_start_sec", "window_end_sec", "ref_rr_ann1_bpm", "ref_rr_ann2_bpm", "ref_rr_mean_bpm", "annotator_difference_bpm", "ann1_breath_count", "ann2_breath_count", BIDMC_POST_INTERPOLATION_FRACTION}])),
         "files": [full_path.name, safe_path.name],
         "target_definition": "Median interval-based breaths/min independently derived from ann1 and ann2; ref_rr_mean_bpm is the mean of available annotator rates.",
         "leakage_control": "The RR-estimation table excludes RESP-derived predictors and ECG/PPG-to-RESP correlations. Keep RESP as reference/auxiliary input for descriptive full-fusion analysis, not as a predictor when predicting a target derived from RESP annotations.",
