@@ -625,3 +625,22 @@ html[data-theme="dark"] .inference-beat-row.selected { background: rgba(109, 168
 .pl-dataset-note p{margin:6px 0 0;color:var(--muted);font-size:11px;line-height:1.7}
 @media(max-width:760px){.pl-dataset-grid{grid-template-columns:1fr}.pl-dataset-card p{min-height:0}}
 @media(max-width:460px){.pl-dataset-card{padding:19px}.pl-dataset-launch{gap:11px;padding:14px}.pl-dataset-launch-icon{width:39px;height:39px}}
+
+
+/* MIT-BIH evaluation clarity and offline-analysis disclosure. */
+.pl-offline-banner{display:flex;flex-direction:column;gap:7px;margin:0 0 17px;padding:15px 17px;border:1px solid color-mix(in srgb,var(--amber) 38%,var(--border));border-radius:14px;background:color-mix(in srgb,var(--amber) 8%,var(--surface));}
+.pl-offline-banner-label{color:var(--amber);font-size:9px;font-weight:850;letter-spacing:1.1px;}
+.pl-offline-banner p{margin:0;color:var(--muted);font-size:11px;line-height:1.7;}
+.pl-report-flag{display:inline-flex;align-items:center;padding:4px 7px;border-radius:6px;background:color-mix(in srgb,var(--amber) 14%,var(--surface));color:var(--amber);font-size:8px;font-weight:850;letter-spacing:.45px;white-space:nowrap;}
+.pl-report-warning{margin:10px 0 0;padding:11px 13px;border:1px solid color-mix(in srgb,var(--amber) 30%,var(--border));border-radius:10px;background:color-mix(in srgb,var(--amber) 7%,var(--surface));color:var(--muted);font-size:10px;line-height:1.65;}
+.pl-report-warning strong{color:var(--text);}
+.pl-confusion-wrap{max-width:100%;overflow-x:auto;overscroll-behavior-x:contain;}
+.pl-confusion-table{min-width:420px;white-space:nowrap;}
+.pl-confusion-table caption{padding:9px 11px;color:var(--muted);font-size:10px;text-align:left;background:var(--surface-2);}
+.pl-confusion-table th:first-child{min-width:145px;}
+.pl-report-details{border:1px solid var(--border);border-radius:11px;background:var(--surface-2);overflow:hidden;}
+.pl-report-details summary{padding:11px 13px;color:var(--text);font-size:11px;font-weight:750;cursor:pointer;list-style-position:inside;}
+.pl-report-details[open] summary{border-bottom:1px solid var(--border);}
+.pl-report-details .pl-confusion-wrap{border:0;border-radius:0;}
+.pl-report-details-section{margin:11px 0;}
+@media(max-width:560px){.pl-offline-banner{padding:13px 14px}.pl-confusion-table{min-width:390px;}}
