@@ -12,11 +12,13 @@
     overview: {label:'Overview', eyebrow:'DUAL RESEARCH FRAMEWORK', title:'Two datasets. One research framework.', subtitle:'Two independent real-data engines connected by a shared Rough-Fuzzy research methodology.', meta:'Local Python engines'},
     mit: {label:'MIT-BIH ECG', eyebrow:'PIPELINE 1 · ECG ARRHYTHMIA', title:'MIT-BIH ECG Research Engine', subtitle:'Patient-disjoint AAMI heartbeat classification using real ECG records, detected R-peaks, Rough Set feature selection and fuzzy rules.', meta:'Real MIT-BIH engine'},
     bidmc: {label:'BIDMC Multimodal', eyebrow:'PIPELINE 2 · CARDIORESPIRATORY', title:'BIDMC Multimodal Research Engine', subtitle:'Trained Rough-Fuzzy respiratory-rate estimators using leakage-controlled ECG + PPG predictors, with RESP retained as the reference modality.', meta:'Real BIDMC dataset engine'},
+    datasets: {label:'Datasets', eyebrow:'DATA SOURCES · PHYSIONET', title:'PulseLab Dataset Library', subtitle:'Explore the official physiological datasets used by the two PulseLab research pipelines.', meta:'Official PhysioNet sources'},
   };
   const icons = {
     overview:'<svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>',
     mit:'<svg viewBox="0 0 24 24"><path d="M2 12h4l2.3-6 4.4 12 2.4-7 2 1H22"/></svg>',
-    bidmc:'<svg viewBox="0 0 24 24"><path d="M3 12h3l2-5 4 10 3-8 2 3h4"/><path d="M12 3v2M12 19v2"/></svg>'
+    bidmc:'<svg viewBox="0 0 24 24"><path d="M3 12h3l2-5 4 10 3-8 2 3h4"/><path d="M12 3v2M12 19v2"/></svg>',
+    datasets:'<svg viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/></svg>'
   };
   const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const fmt = (v, digits=1) => Number.isFinite(Number(v)) ? Number(v).toFixed(digits) : '—';
@@ -108,6 +110,7 @@
     if (page === 'overview') renderOverview();
     if (page === 'mit') renderMIT();
     if (page === 'bidmc') renderBIDMC();
+    if (page === 'datasets') renderDatasets();
   }
   function buildNav() {
     $('#nav').innerHTML = `<div class="sidebar-section-label">RESEARCH WORKSPACES</div>${Object.keys(pages).map(key=>`<button class="nav-item ${key==='overview'?'on':''}" data-page="${key}" type="button" aria-label="${esc(pages[key].label)}" title="${esc(pages[key].label)}">${icons[key]}<span class="nav-label">${pages[key].label}</span></button>`).join('')}`;
@@ -145,9 +148,34 @@
         <article class="pl-engine-card mit-card"><div class="pl-engine-top"><span class="pl-engine-index">PIPELINE 01</span>${pill('AAMI ARRHYTHMIA','blue')}</div><h2>MIT-BIH ECG Engine</h2><p>Real ECG waveform analysis, R-peak detection, heartbeat segmentation, 47-feature extraction, Rough Set reduction and fuzzy AAMI classification.</p><div class="pl-engine-meta"><span>MIT-BIH Arrhythmia Database</span><span>360 Hz</span><span>5 AAMI classes</span></div><button class="btn pri" data-go="mit">Open ECG engine <span aria-hidden="true">→</span></button></article>
         <article class="pl-engine-card bidmc-card"><div class="pl-engine-top"><span class="pl-engine-index">PIPELINE 02</span>${pill('MULTIMODAL','green')}</div><h2>BIDMC Multimodal Engine</h2><p>Real synchronized ECG + PPG + respiration signals, window-level multimodal feature fusion and dual-annotator respiratory-rate references.</p><div class="pl-engine-meta"><span>BIDMC Dataset</span><span>125 Hz</span><span>3 modalities</span></div><button class="btn pri" data-go="bidmc">Open BIDMC engine <span aria-hidden="true">→</span></button></article>
       </div>
+      <button class="pl-dataset-launch" data-go="datasets" type="button"><span class="pl-dataset-launch-icon" aria-hidden="true">${icons.datasets}</span><span class="pl-dataset-launch-copy"><strong>Explore the datasets</strong><small>Open the official MIT-BIH and BIDMC dataset sources used by PulseLab.</small></span><span class="pl-dataset-launch-arrow" aria-hidden="true">→</span></button>
       ${card('Live research workspace',`<div class="grid">${kpi(mitCount,'MIT-BIH records available locally')}${kpi(models,'Saved MIT-BIH models')}${kpi(exp,'MIT-BIH experiment runs')}${kpi(`${bidmcCount}/53`,'BIDMC records indexed')}${kpi(state.bidmcModel?.available?'2 trained':'—','BIDMC trained estimators')}</div><p class="mut" style="margin-top:12px">These values come from the local Python API and saved research artifacts. No signals or predictions are generated in the browser.</p>`)}
       ${card('Shared Rough-Fuzzy research framework',`<div class="pl-framework"><div><b>Feature engineering</b><span>Dataset-specific, synchronized signal descriptors</span></div><i>→</i><div><b>Rough Set selection</b><span>Training-only attribute reduction</span></div><i>→</i><div><b>Fuzzy inference</b><span>Interpretable rule-based outputs</span></div></div><p class="mut">Datasets, schemas, models and evaluation metrics remain isolated between pipelines. Only validated methodological components are shared.</p>`)}
       ${card('Research and safety boundary',`<p class="mut">PulseLab is an academic research prototype, not a medical device. Its outputs are not clinically validated and must not be used for diagnosis, treatment or urgent decisions. All displayed outputs are sourced from real dataset files, saved experiment artifacts or the local Python API.</p>`)}
+    `;
+    $('#v').querySelectorAll('[data-go]').forEach(b=>b.addEventListener('click',()=>setPage(b.dataset.go)));
+  }
+  function renderDatasets() {
+    $('#v').innerHTML = `
+      <div class="pl-dataset-intro">These are the original PhysioNet dataset pages. Use the official pages to read the documentation, citation requirements, access conditions and download instructions.</div>
+      <div class="pl-dataset-grid">
+        <article class="pl-dataset-card mit-dataset-card">
+          <div class="pl-dataset-card-head"><span class="pl-dataset-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M2 12h4l2.3-6 4.4 12 2.4-7 2 1H22"/></svg></span><span class="pl-dataset-tag">PIPELINE 01 · ECG</span></div>
+          <h2>MIT-BIH Arrhythmia Database</h2>
+          <p>A benchmark dataset of annotated ECG recordings used by PulseLab for heartbeat detection, beat segmentation and AAMI arrhythmia classification.</p>
+          <div class="pl-dataset-facts"><span>WFDB format</span><span>360 Hz</span><span>Two ECG channels</span></div>
+          <a class="btn pri" href="https://physionet.org/content/mitdb/1.0.0/" target="_blank" rel="noopener noreferrer">Open official dataset <span aria-hidden="true">↗</span></a>
+        </article>
+        <article class="pl-dataset-card bidmc-dataset-card">
+          <div class="pl-dataset-card-head"><span class="pl-dataset-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 12h3l2-5 4 10 3-8 2 3h4"/><path d="M12 3v2M12 19v2"/></svg></span><span class="pl-dataset-tag">PIPELINE 02 · MULTIMODAL</span></div>
+          <h2>BIDMC PPG and Respiration Dataset</h2>
+          <p>A multimodal collection containing ECG, pulse oximeter (PPG) and respiratory signals, with breath annotations used as respiratory-rate references.</p>
+          <div class="pl-dataset-facts"><span>CSV signals</span><span>125 Hz</span><span>ECG · PPG · RESP</span></div>
+          <a class="btn pri" href="https://physionet.org/content/bidmc/1.0.0/" target="_blank" rel="noopener noreferrer">Open official dataset <span aria-hidden="true">↗</span></a>
+        </article>
+      </div>
+      <div class="pl-dataset-note"><strong>Before downloading</strong><p>Read the dataset's PhysioNet page for its license, citation instructions and access requirements. The raw datasets are not bundled with the PulseLab source code; follow the project's setup guide for the expected local folder structure.</p></div>
+      <div class="row"><button class="btn" data-go="overview" type="button">← Back to overview</button><a class="btn" href="https://physionet.org/" target="_blank" rel="noopener noreferrer">Visit PhysioNet ↗</a></div>
     `;
     $('#v').querySelectorAll('[data-go]').forEach(b=>b.addEventListener('click',()=>setPage(b.dataset.go)));
   }
