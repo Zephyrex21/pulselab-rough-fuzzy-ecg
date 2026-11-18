@@ -84,9 +84,10 @@
     ]);
     const classDetails=Object.entries(metrics).map(([name,m])=>renderPerClassMetrics(name,m,trainDist)).join('');
     const confusionDetails=Object.entries(metrics).map(([name,m])=>`
-      <section class="result-section"><h3>${esc(name)} · Confusion matrix</h3>
+      <section class="result-section pl-report-details-section"><details class="pl-report-details">
+        <summary>${esc(name)} · View confusion matrix</summary>
         ${renderConfusionMatrix(m.confusion_matrix,m.class_order||['N','S','V','F','Q'])}
-      </section>`).join('');
+      </details></section>`).join('');
     const lowSupport=Object.entries(trainDist).filter(([,count])=>Number(count)<20);
     const artifacts=(summary.artifacts||[]).filter(name=>/\.(csv|json|md)$/i.test(name));
     return `${keyValueGrid([
