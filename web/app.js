@@ -10,7 +10,7 @@
   };
   const pages = {
     overview: {label:'Overview', eyebrow:'DUAL RESEARCH FRAMEWORK', title:'Two datasets. One research framework.', subtitle:'Two independent real-data engines connected by a shared Rough-Fuzzy research methodology.', meta:'Local Python engines'},
-    mit: {label:'MIT-BIH ECG', eyebrow:'PIPELINE 1 · ECG ARRHYTHMIA', title:'MIT-BIH ECG Research Engine', subtitle:'Patient-disjoint AAMI heartbeat classification using real ECG records, detected R-peaks, Rough Set feature selection and fuzzy rules.', meta:'Real MIT-BIH engine'},
+    mit: {label:'MIT-BIH ECG', eyebrow:'PIPELINE 1 · ECG ARRHYTHMIA', title:'MIT-BIH ECG Research Engine', subtitle:'Offline, retrospective AAMI heartbeat analysis using recorded ECG signals, detected R-peaks, Rough Set feature selection and fuzzy rules. This is not a real-time monitor.', meta:'Offline ECG analysis'},
     bidmc: {label:'BIDMC Multimodal', eyebrow:'PIPELINE 2 · CARDIORESPIRATORY', title:'BIDMC Multimodal Research Engine', subtitle:'Trained Rough-Fuzzy respiratory-rate estimators using leakage-controlled ECG + PPG predictors, with RESP retained as the reference modality.', meta:'Real BIDMC dataset engine'},
     datasets: {label:'Datasets', eyebrow:'DATA SOURCES · PHYSIONET', title:'PulseLab Dataset Library', subtitle:'Explore the official physiological datasets used by the two PulseLab research pipelines.', meta:'Official PhysioNet sources'},
   };
@@ -44,23 +44,64 @@
     if(!Array.isArray(items)||!items.length) return '';
     return `<section class="result-section"><h3>${esc(title)}</h3><ul class="result-list">${items.map(item=>`<li>${esc(typeof item==='string'?item:JSON.stringify(item))}</li>`).join('')}</ul></section>`;
   }
-  const metricValue=(value)=>value===null||value===undefined?'—':(Number.isFinite(Number(value))?fmt(Number(value)*((Math.abs(Number(value))<=1)?100:1),1)+(Math.abs(Number(value))<=1?'%':'') : esc(value));
+  const metricValue=(value)=>value===null||value===undefined||value===''?'—':(Number.isFinite(Number(value))?fmt(Number(value)*((Math.abs(Number(value))<=1)?100:1),1)+(Math.abs(Number(value))<=1?'%':'') : esc(value));
+  const metricPercent=(value)=>value===null||value===undefined||value===''?'—':(Number.isFinite(Number(value))?pct(Number(value)):'—');
+  const metricNumber=(value,digits=3)=>value===null||value===undefined||value===''?'—':(Number.isFinite(Number(value))?fmt(Number(value),digits):'—');
+  function renderConfusionMatrix(matrix, classOrder) {
+    if(!Array.isArray(matrix)||!matrix.length) return '<p class="mut">Confusion matrix is not available for this model.</p>';
+    const labels=Array.isArray(classOrder)&&classOrder.length?classOrder:['N','S','V','F','Q'];
+    const rows=matrix.map((values,index)=>`<tr><th scope="row">${esc(labels[index]??index)}</th>${(Array.isArray(values)?values:[]).map(value=>`<td>${esc(value)}</td>`).join('')}</tr>`).join('');
+    return `<div class="pl-table-wrap pl-confusion-wrap"><table class="pl-table pl-confusion-table"><caption>Rows = actual class · Columns = predicted class</caption><thead><tr><th scope="col">Actual ↓ / Predicted →</th>${labels.map(label=>`<th scope="col">${esc(label)}</th>`).join('')}</tr></thead><tbody>${rows}</tbody></table></div>`;
+  }
+  function renderPerClassMetrics(modelName, metrics, trainDistribution) {
+    const perClass=Array.isArray(metrics.per_class)?metrics.per_class:[];
+    if(!perClass.length) return '';
+    const rows=perClass.map(item=>{
+      const label=String(item.class??'—');
+      const trainCount=Number(trainDistribution[label]??0);
+      const testCount=Number(item.support??0);
+      const lowSupport=trainCount<20;
+      const status=lowSupport?'<span class="pl-report-flag">LOW TRAIN SUPPORT</span>':'<span class="mut">—</span>';
+      return [`<strong>${esc(label)}</strong>`,esc(Number.isFinite(trainCount)?trainCount:'—'),esc(testCount),metricPercent(item.precision),metricPercent(item.recall_sensitivity),metricPercent(item.f1),status];
+    });
+    return `<section class="result-section"><h3>${esc(modelName)} · Class-wise performance</h3>${table(['Class','Training beats','Test support','Precision','Recall / sensitivity','F1-score','Support note'],rows)}<p class="mut">Training support is taken from the saved training split. Test support is the number of true examples in the held-out split. Classes with fewer than 20 training beats are flagged as low support.</p></section>`;
+  }
   function renderExperimentSummary(summary) {
-    const modelRows=Object.entries(summary.metrics||{}).map(([name,m])=>[
-      esc(name),metricValue(m.accuracy),metricValue(m.balanced_accuracy),metricValue(m.macro_f1),metricValue(m.weighted_f1),fmt(m.precision_macro,3),fmt(m.recall_macro,3)
+    const metrics=summary.metrics||{};
+    const trainDist=summary.train_class_distribution||{};
+    const testDist=summary.test_class_distribution||{};
+    const modelRows=Object.entries(metrics).map(([name,m])=>[
+      esc(name),metricPercent(m.accuracy),metricPercent(m.balanced_accuracy),metricPercent(m.macro_f1),
+      metricPercent(m.macro_f1_all_aami),metricPercent(m.weighted_f1),metricPercent(m.macro_precision),metricPercent(m.macro_recall)
     ]);
     const comparisonRows=(summary.model_comparison||[]).map(m=>[
-      esc(m.model||m.model_name||'—'),metricValue(m.accuracy),metricValue(m.balanced_accuracy),metricValue(m.macro_f1),metricValue(m.weighted_f1),fmt(m.precision_macro,3),fmt(m.recall_macro,3)
+      esc(m.model||m.model_name||'—'),metricPercent(m.accuracy),metricPercent(m.balanced_accuracy),
+      metricPercent(m.macro_f1),metricPercent(m.macro_f1_all_aami),metricPercent(m.weighted_f1),
+      metricPercent(m.macro_precision),metricPercent(m.macro_recall)
     ]);
-    const trainDist=Object.entries(summary.train_class_distribution||{}).map(([k,v])=>[esc(k),esc(v)]);
-    const testDist=Object.entries(summary.test_class_distribution||{}).map(([k,v])=>[esc(k),esc(v)]);
-    const modelTable=modelRows.length?table(['Model','Accuracy','Balanced acc.','Macro F1','Weighted F1','Macro precision','Macro recall'],modelRows):table(['Model','Accuracy','Balanced acc.','Macro F1','Weighted F1','Macro precision','Macro recall'],comparisonRows);
-    const artifacts=(summary.artifacts||[]).filter(name=>/\.(csv|json|md)$/i.test(name));
+    const evaluationRows=modelRows.length?modelRows:comparisonRows;
+    const classSupportRows=['N','S','V','F','Q'].map(label=>[
+      esc(label),esc(trainDist[label]??0),esc(testDist[label]??0),
+      Number(trainDist[label]??0)<20?'<span class="pl-report-flag">LOW TRAIN SUPPORT</span>':'—'
+    ]);
+    const classDetails=Object.entries(metrics).map(([name,m])=>renderPerClassMetrics(name,m,trainDist)).join('');
+    const confusionDetails=Object.entries(metrics).map(([name,m])=>`
+      <section class="result-section"><h3>${esc(name)} · Confusion matrix</h3>
+        ${renderConfusionMatrix(m.confusion_matrix,m.class_order||['N','S','V','F','Q'])}
+      </section>`).join('');
+    const lowSupport=Object.entries(trainDist).filter(([,count])=>Number(count)<20);
+    const artifacts=(summary.artifacts||[]).filter(name=>/\\.(csv|json|md)$/i.test(name));
     return `${keyValueGrid([
-      ['Training beats',summary.n_train],['Testing beats',summary.n_test],['Features',summary.n_features],['Training patients',summary.n_train_patients],['Testing patients',summary.n_test_patients],['Training records',summary.n_train_records],['Testing records',summary.n_test_records],['Split protocol',summary.metadata?.split_policy||summary.metadata?.split_protocol],['Created (UTC)',summary.created_at_utc]
-    ])}<section class="result-section"><h3>Model evaluation</h3>${modelTable}</section>
-      ${trainDist.length?`<section class="result-section"><h3>Training class distribution</h3>${table(['Class','Beats'],trainDist)}</section>`:''}
-      ${testDist.length?`<section class="result-section"><h3>Testing class distribution</h3>${table(['Class','Beats'],testDist)}</section>`:''}
+      ['Training beats',summary.n_train],['Testing beats',summary.n_test],['Input features',summary.n_features],
+      ['Training patients',summary.n_train_patients],['Testing patients',summary.n_test_patients],
+      ['Training records',summary.n_train_records],['Testing records',summary.n_test_records],
+      ['Split protocol',summary.metadata?.split_policy||summary.metadata?.split_protocol],['Created (UTC)',summary.created_at_utc]
+    ])}
+      <section class="result-section"><h3>Model comparison</h3>${table(['Model','Accuracy','Balanced accuracy','Macro-F1 (observed classes)','Macro-F1 (all 5 AAMI)','Weighted F1','Macro precision','Macro recall'],evaluationRows)}</section>
+      <section class="result-section"><h3>Class distribution and training support</h3>${table(['AAMI class','Training beats','Test support','Training support note'],classSupportRows)}
+      ${lowSupport.length?`<p class="pl-report-warning"><strong>Low training support:</strong> ${lowSupport.map(([label,count])=>`${esc(label)} (${esc(count)} beats)`).join(', ')}. Results for these classes are highly uncertain; a few examples are not enough to establish reliable class learning.</p>`:''}</section>
+      ${classDetails}
+      ${confusionDetails}
       ${listBlock('Warnings',summary.warnings)}${listBlock('Research notes',summary.notes)}
       ${artifacts.length?`<section class="result-section"><h3>Available run artifacts</h3><div class="result-artifacts">${artifacts.map(name=>`<a class="btn" download href="/api/experiments/${encodeURIComponent(summary.run_id)}/artifacts/${encodeURIComponent(name)}">${esc(name)} <span aria-hidden="true">↓</span></a>`).join('')}</div></section>`:''}
       <p class="result-disclaimer">${esc(summary.disclaimer||'Academic research prototype. Not clinically validated.')}</p>`;
@@ -186,10 +227,11 @@
     const mit=state.mit||{};
     const modelOptions=models.map((m,i)=>`<option value="${esc(m.model_id)}" ${i===0?'selected':''}>${esc(m.model_name)} · ${esc(m.run_id)}</option>`).join('');
     $('#v').innerHTML = `
+      <div class="pl-offline-banner"><span class="pl-offline-banner-label">OFFLINE · RETROSPECTIVE ANALYSIS</span><p>PulseLab analyses recorded ECG segments. The current pipeline uses zero-phase filtering and features such as the next R-R interval, which require surrounding or future-beat context. It is not a real-time or streaming heart monitor.</p></div>
       ${card('MIT-BIH engine status',`<div class="grid">${kpi(`${mit.available_requested??0}/${mit.train_records_requested+mit.test_records_requested||0}`,'quick split records available')}${kpi(models.length,'saved trained models')}${kpi(exp?exp.n_train:'—','training beats')}${kpi(exp?exp.n_test:'—','testing beats')}</div><p class="mut" style="margin-top:12px">Dataset root: <code>${esc(mit.dataset_root||'data/mitdb')}</code>. The MIT-BIH waveform dataset is not bundled; place records in this folder or use the supported download workflow.</p>${mit.ready_for_selected_experiment?pill('Quick split ready','green'):pill(`${(mit.missing_records||[]).length} records missing locally`,'amber')}`)}
       ${card('Saved patient-disjoint experiment',exp?`<div class="row">${pill(exp.patient_disjoint?'PATIENT-DISJOINT':'CHECK SPLIT',exp.patient_disjoint?'green':'amber')}<span class="mut">${esc(exp.run_id)} · ${esc(exp.created_at_utc||'')}</span></div><div class="grid">${kpi(exp.best_model?.model||'—','highest macro-F1 model')}${kpi(pct(exp.best_model?.accuracy),'accuracy')}${kpi(pct(exp.best_model?.macro_f1),'macro F1')}${kpi(pct(exp.best_model?.balanced_accuracy),'balanced accuracy')}</div><p class="mut" style="margin-top:12px">Model scores are taken from the saved training run. The supplied run was trained using source version 0.6.0; current preprocessing is version 0.6.1. This historical run is excluded from uploaded-signal inference because its R-peak detector contract is not recorded. Retrain with the current automatic detector to create a matched model/pipeline pair.</p><div class="row"><button class="btn" id="refresh-mit">Refresh status</button><button class="btn" id="view-run-summary" type="button">View run summary</button></div>`:`<p class="mut">No saved experiment manifest was found. Add the trained artifact export to models/ and experiments/ or run an MIT-BIH experiment once records are available.</p>`)}
       ${card('Run the real MIT-BIH research pipeline',`<p class="mut">This launches the Python pipeline on local MIT-BIH WFDB files. It does not use browser-generated ECG signals.</p><div class="row"><label class="mut">Experiment size</label><select id="mit-quick"><option value="true">Quick engineering subset</option><option value="false">Complete patient-disjoint split</option></select><label class="mut">Peak source</label><select id="mit-peaks"><option value="detected">Automatic R-peak detection</option><option value="annotations">Reference annotations (benchmark only)</option></select><button class="btn pri" id="run-mit" ${!mit.ready_for_selected_experiment?'disabled':''}>Start real MIT-BIH experiment</button></div><div id="mit-job" class="mut"></div>${!mit.ready_for_selected_experiment?`<p class="mut">Missing records include: ${esc((mit.missing_records||[]).slice(0,10).join(', '))}${(mit.missing_records||[]).length>10?' …':''}. Use the Research API dataset download flow or provide WFDB records.</p>`:''}`)}
-      ${card('Saved-model ECG inference',models.length?`<p class="mut">Run an uploaded ECG signal through a saved MIT-BIH-trained Python model. No browser classifier is involved.</p><div class="pl-form-grid"><label>Trained model<select id="mit-model">${modelOptions}</select></label><label>Sampling rate (Hz)<input id="mit-fs" type="number" min="100" max="2000" value="360"></label><label class="wide">ECG signal CSV/TXT<input id="mit-file" type="file" accept=".csv,.txt"></label></div><div class="row"><button class="btn pri" id="mit-infer">Run Python ECG inference</button><span class="mut">3 seconds–10 minutes · maximum 20 MB</span></div><div id="mit-infer-result"></div>`:`<p class="mut">No compatible saved MIT-BIH model was discovered. Historical runs without a matching preprocessing/R-peak detector contract are intentionally excluded from uploaded-signal inference. Retrain with the current automatic R-peak detector to create a compatible model.`)}
+      ${card('Saved-model offline ECG inference',models.length?`<p class="mut">Analyse an uploaded, recorded ECG signal with a saved MIT-BIH-trained Python model. This is retrospective file-based inference, not continuous live monitoring. No browser classifier is involved.</p><div class="pl-form-grid"><label>Trained model<select id="mit-model">${modelOptions}</select></label><label>Sampling rate (Hz)<input id="mit-fs" type="number" min="100" max="2000" value="360"></label><label class="wide">ECG signal CSV/TXT<input id="mit-file" type="file" accept=".csv,.txt"></label></div><div class="row"><button class="btn pri" id="mit-infer">Run Python ECG inference</button><span class="mut">3 seconds–10 minutes · maximum 20 MB</span></div><div id="mit-infer-result"></div>`:`<p class="mut">No compatible saved MIT-BIH model was discovered. Historical runs without a matching preprocessing/R-peak detector contract are intentionally excluded from uploaded-signal inference. Retrain with the current automatic R-peak detector to create a compatible model.`)}
       ${card('Evaluation caution',`<p class="mut">The supplied trained run has strong overall accuracy but low minority-class recall. Accuracy alone is not evidence of reliable arrhythmia recognition. Inspect macro-F1, balanced accuracy, per-class sensitivity, patient-level evaluation and detector false-negative counts before interpreting results.</p>`)}
     `;
     const refreshMit=$('#refresh-mit');
