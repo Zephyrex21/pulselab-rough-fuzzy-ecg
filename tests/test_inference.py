@@ -112,6 +112,22 @@ def test_discover_saved_models_lists_only_compatible_existing_artifacts(tmp_path
     assert found[0]["calibration_status"] == "fitted"
 
 
+
+def test_summarise_heart_rate_uses_mean_consecutive_rr_interval():
+    summary = inference._summarise_heart_rate(np.array([1080, 360, 720, 720]), 360)
+    assert summary["mean_heart_rate_bpm"] == pytest.approx(60.0)
+    assert summary["mean_rr_interval_ms"] == pytest.approx(1000.0)
+    assert summary["n_rr_intervals"] == 2
+    assert "mean interval" in summary["heart_rate_method"]
+
+
+def test_summarise_heart_rate_handles_too_few_detected_peaks():
+    summary = inference._summarise_heart_rate(np.array([360]), 360)
+    assert summary["mean_heart_rate_bpm"] is None
+    assert summary["n_rr_intervals"] == 0
+
+
+
 def test_execute_inference_persists_beat_results_without_raw_signal(tmp_path, monkeypatch):
     experiments, project, models, run_id, columns = _make_saved_run(tmp_path)
     monkeypatch.setattr(inference.joblib, "load", lambda _path: FixtureSavedModel())
@@ -142,6 +158,8 @@ def test_execute_inference_persists_beat_results_without_raw_signal(tmp_path, mo
         models_root=models,
     )
     assert result["n_predictions"] == 2
+    assert result["mean_heart_rate_bpm"] == pytest.approx(60.0)
+    assert result["n_rr_intervals"] == 2
     assert [row["predicted_class"] for row in result["predictions"]] == ["N", "V"]
     assert result["predictions"][1]["time_seconds"] == pytest.approx(2.0)
     assert result["predictions"][0]["normalised_score_entropy"] is not None

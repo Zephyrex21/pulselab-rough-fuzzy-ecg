@@ -388,6 +388,44 @@ def _to_float(value: str) -> float | None:
     return result if np.isfinite(result) else None
 
 
+
+def _summarise_heart_rate(rpeaks: Any, sampling_rate_hz: float) -> dict[str, Any]:
+    """Summarise average heart rate from consecutive automatically detected R-peaks.
+
+    The reported mean is 60 divided by the mean RR interval, i.e. the overall
+    beat rate across the first-to-last detected peak span. It is an estimate
+    dependent on detector accuracy, not an annotated or clinical measurement.
+    """
+    peaks = np.asarray(rpeaks if rpeaks is not None else [], dtype=float).reshape(-1)
+    peaks = peaks[np.isfinite(peaks)]
+    if not np.isfinite(sampling_rate_hz) or sampling_rate_hz <= 0:
+        raise InferenceError("The processed ECG sampling rate is invalid.")
+    peaks = np.unique(peaks)
+    if len(peaks) < 2:
+        return {
+            "mean_heart_rate_bpm": None,
+            "mean_rr_interval_ms": None,
+            "n_rr_intervals": 0,
+            "heart_rate_method": "unavailable: fewer than two distinct R-peaks",
+        }
+    rr_seconds = np.diff(np.sort(peaks)) / float(sampling_rate_hz)
+    rr_seconds = rr_seconds[np.isfinite(rr_seconds) & (rr_seconds > 0)]
+    if not len(rr_seconds):
+        return {
+            "mean_heart_rate_bpm": None,
+            "mean_rr_interval_ms": None,
+            "n_rr_intervals": 0,
+            "heart_rate_method": "unavailable: no valid consecutive R-R intervals",
+        }
+    mean_rr_seconds = float(np.mean(rr_seconds))
+    return {
+        "mean_heart_rate_bpm": float(60.0 / mean_rr_seconds),
+        "mean_rr_interval_ms": float(mean_rr_seconds * 1000.0),
+        "n_rr_intervals": int(len(rr_seconds)),
+        "heart_rate_method": "60 divided by the mean interval between consecutive automatically detected R-peaks",
+    }
+
+
 def _normalise_score_matrix(scores: Any, classes: list[str], n_rows: int) -> np.ndarray | None:
     if scores is None:
         return None
@@ -551,6 +589,7 @@ def execute_inference(
         warnings.append(f"The model returned labels outside the expected AAMI N/S/V/F/Q set: {unexpected_labels}. Review the selected run.")
     if manifest.get("metadata", {}).get("peak_source") == "annotations":
         warnings.append("The selected model was trained with annotation-guided reference beats; uploaded-signal inference uses automatically detected R-peaks, so this is a processing-protocol mismatch.")
+    heart_rate_summary = _summarise_heart_rate(output.get("rpeaks", []), float(output.get("fs", config.FS)))
     summary = {
         "inference_id": inference_id,
         "created_at_utc": datetime.now(timezone.utc).isoformat(),
@@ -574,6 +613,7 @@ def execute_inference(
             "calibration_status": entry.get("calibration_status", "not_available"),
         },
         "n_predictions": len(beat_rows),
+        **heart_rate_summary,
         "waveform_preview_available": bool(output.get("beats") and len(output.get("beats", [])) > 0),
         "class_counts": counts,
         "score_interpretation": entry["score_interpretation"],
