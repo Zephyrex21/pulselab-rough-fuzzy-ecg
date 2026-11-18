@@ -11,9 +11,9 @@ PulseLab is an academic research prototype with **two independent, real-data res
 - Rough-Set feature selection and fuzzy-rule AAMI classification.
 - Random Forest and RBF-SVM comparison baselines.
 - Patient-disjoint evaluation, reproducible experiment manifests and Python model inference.
-- The supplied four-model training export and its reports are included under `models/` and `experiments/`.
+- The latest compatible four-model export and its reports are distributed as a separate GitHub Actions artifact; they are installed under `models/` and `experiments/` locally, not committed as binary files.
 
-**Model compatibility note:** the supplied November 14, 2026 training export was produced with source version 0.6.0. PulseLab 0.7.0 uses the adaptive R-peak detector introduced in 0.6.1. Because this changes feature generation, the supplied metrics describe the historical run; retrain MIT-BIH models with the current detector before treating the shipped model as a fully matched preprocessing/model pair. Legacy MIT-BIH model exports without a matching `inference_pipeline_contract` (or trained using annotation-guided peaks) are intentionally excluded from uploaded-signal inference; their saved research reports remain available.
+**Current compatible model run:** `pulselab_patient_disjoint_adaptive_44143473651` was trained on 17 November 2026 using the adaptive detector (`adaptive-local-threshold-v1`) and the current versioned inference-pipeline contract. It uses 22 training records and 21 held-out records under a strict patient-disjoint split. The four-model bundle is distributed separately as the GitHub Actions artifact **`pulselab-mitbih-recovered-pulselab_patient_disjoint_adaptive_44143473651`**; extract its contents at the repository root. Model binaries are not tracked by Git. The older November 14 run remains historical and is intentionally excluded from uploaded-signal inference because its input-pipeline contract does not match current preprocessing. Current model discovery checks the run contract and each model's SHA-256 before loading.
 
 ### 2. BIDMC — multimodal cardiorespiratory research
 
