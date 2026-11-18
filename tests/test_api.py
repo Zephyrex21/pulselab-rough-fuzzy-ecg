@@ -399,7 +399,13 @@ def test_frontend_result_summaries_are_in_app_not_raw_json_tabs():
     assert "renderInferenceSummary" in script
     assert "markdownReportToHtml" in script
     assert "state.prediction=null" in script
-    assert 'target="_blank"' not in script
+    external_links = [
+        '<a' + part.split('>', 1)[0] + '>'
+        for part in script.split('<a')[1:]
+        if 'target="_blank"' in part.split('>', 1)[0]
+    ]
+    assert external_links
+    assert all('rel="noopener noreferrer"' in tag for tag in external_links)
     assert 'class="nav-label"' in script
     assert "body.sidebar-collapsed .nav-label" in styles
     assert "result-dialog" in styles
