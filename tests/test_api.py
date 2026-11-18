@@ -404,3 +404,40 @@ def test_frontend_result_summaries_are_in_app_not_raw_json_tabs():
     assert "body.sidebar-collapsed .nav-label" in styles
     assert "result-dialog" in styles
 
+
+
+def test_bidmc_post_interpolation_metadata_is_not_labelled_as_signal_quality():
+    import pandas as pd
+
+    frame = pd.DataFrame({
+        "window_quality": [1.0, 0.95],
+        "ppg_mean": [0.1, 0.2],
+    })
+    renamed = server._rename_bidmc_quality_metadata_column(frame)
+
+    assert "window_quality" not in renamed.columns
+    assert "post_interpolation_finite_fraction" in renamed.columns
+    assert renamed["post_interpolation_finite_fraction"].tolist() == [1.0, 0.95]
+    assert "not measure original missingness" in server.BIDMC_SIGNAL_QUALITY_NOTE
+
+
+def test_bidmc_prediction_metadata_marks_signal_quality_as_not_assessed():
+    payload = {
+        "predictions": [
+            {"window_index": 0, "window_quality": 1.0},
+            {"window_index": 1, "window_quality": 1.0},
+        ]
+    }
+    clarified = server._clarify_bidmc_prediction_quality(payload)
+
+    assert clarified["signal_quality_assessment"]["status"] == "not_assessed"
+    assert all("window_quality" not in row for row in clarified["predictions"])
+    assert all("post_interpolation_finite_fraction" in row for row in clarified["predictions"])
+    assert all(row["post_interpolation_finite_fraction"] == 1.0 for row in clarified["predictions"])
+
+
+def test_bidmc_ui_explains_post_interpolation_fraction_limitation():
+    script = (server.WEB_DIR / "app.js").read_text(encoding="utf-8")
+    assert "Signal quality is not currently assessed" in script
+    assert "post_interpolation_finite_fraction" in script
+    assert "does not measure original missingness" in script
