@@ -3,9 +3,9 @@
 Run from the repository root:
     python tools/export_mitbih_demo_csv.py --max-records 5
 
-The script exports the first records in the configured patient-disjoint test
-split, preserves the two source ECG leads and native sampling rate, and writes
-only derived demo CSVs under data/demo_ecg_csv/.
+The script exports up to five minutes from the first records in the configured
+patient-disjoint test split, preserves the two source ECG leads and native
+sampling rate, and writes only derived demo CSVs under data/demo_ecg_csv/.
 """
 from __future__ import annotations
 
@@ -23,7 +23,7 @@ if str(ROOT) not in sys.path:
 import config
 
 
-def export_record(record_id: str, data_dir: Path, output_dir: Path) -> Path:
+def export_record(record_id: str, data_dir: Path, output_dir: Path, duration_seconds: float) -> Path:
     try:
         import wfdb
     except ImportError as exc:
@@ -44,7 +44,9 @@ def export_record(record_id: str, data_dir: Path, output_dir: Path) -> Path:
     if len(lead_names) < 2:
         lead_names = [f"ECG_{i + 1}" for i in range(signal.shape[1])]
 
-    selected = signal[:, :2]
+    # The upload API caps a signal at 10 minutes; export a bounded segment.
+    max_samples = min(len(signal), int(round(duration_seconds * float(record.fs))))
+    selected = signal[:max_samples, :2]
     if not np.isfinite(selected).all():
         raise ValueError(f"Record {record_id} contains non-finite samples in its first two leads.")
 
@@ -74,12 +76,15 @@ def main() -> int:
         "--max-records", type=int, default=5,
         help="Number of available held-out records to export when --records is omitted (default: 5).",
     )
+    parser.add_argument("--duration-seconds", type=float, default=300.0, help="Duration exported per record (default: 300 seconds; API maximum: 600).")
     parser.add_argument("--data-dir", type=Path, default=config.DATA_DIR)
     parser.add_argument("--output-dir", type=Path, default=ROOT / "data" / "demo_ecg_csv")
     args = parser.parse_args()
 
     if args.max_records < 1:
         parser.error("--max-records must be at least 1.")
+    if not 3.0 <= args.duration_seconds <= 600.0:
+        parser.error("--duration-seconds must be between 3 and 600.")
 
     _, heldout_records = config.get_record_split("patient-disjoint")
     selected = args.records or heldout_records[:args.max_records]
@@ -93,7 +98,7 @@ def main() -> int:
     exported = []
     for record_id in selected:
         try:
-            exported.append(export_record(record_id, args.data_dir, args.output_dir))
+            exported.append(export_record(record_id, args.data_dir, args.output_dir, args.duration_seconds))
         except (FileNotFoundError, RuntimeError, ValueError, OSError) as exc:
             print(f"Skipped {record_id}: {exc}", file=sys.stderr)
 
