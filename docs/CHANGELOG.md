@@ -1,3 +1,9 @@
+## 18 November 2026 — presentation-readiness documentation correction
+
+- Updated the README and MIT-BIH artifact guide to identify the compatible 17 November adaptive-detector run (`pulselab_patient_disjoint_adaptive_44143473651`) as the current inference artifact.
+- Preserved the November 14 model environment record as historical provenance and clarified that model binaries are distributed separately from Git source.
+- Documented the current held-out detector/classifier metrics and minority-class limitations; no model code, training outputs or model artifacts were modified.
+
 ## Unreleased — MIT-BIH package import fix and recovery
 
 - Fixed repository-root import resolution in the MIT-BIH packager and switched the training workflow to module invocation.

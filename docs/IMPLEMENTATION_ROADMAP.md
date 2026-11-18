@@ -60,7 +60,7 @@
 - Improve BIDMC respiratory-rate features and modeling, because the first held-out results are close to the median baseline.
 - Investigate whether PPG-only and ECG+PPG add reproducible value on more than one fixed patient split; retain the two annotator-specific evaluations and RESP leakage safeguards.
 - Add repeat patient-grouped evaluation / robustness analysis and, where possible, independent external validation.
-- Re-train MIT-BIH with the current adaptive R-peak detector before treating the supplied historical artifacts as matched to current preprocessing.
+- Improve minority-class MIT-BIH performance (especially S, F and Q) and validate using repeated patient-grouped splits or an independent dataset before making stronger performance claims.
 
 ## Research boundaries
 
