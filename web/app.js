@@ -44,9 +44,7 @@
     if(!Array.isArray(items)||!items.length) return '';
     return `<section class="result-section"><h3>${esc(title)}</h3><ul class="result-list">${items.map(item=>`<li>${esc(typeof item==='string'?item:JSON.stringify(item))}</li>`).join('')}</ul></section>`;
   }
-  const metricValue=(value)=>value===null||value===undefined||value===''?'—':(Number.isFinite(Number(value))?fmt(Number(value)*((Math.abs(Number(value))<=1)?100:1),1)+(Math.abs(Number(value))<=1?'%':'') : esc(value));
   const metricPercent=(value)=>value===null||value===undefined||value===''?'—':(Number.isFinite(Number(value))?pct(Number(value)):'—');
-  const metricNumber=(value,digits=3)=>value===null||value===undefined||value===''?'—':(Number.isFinite(Number(value))?fmt(Number(value),digits):'—');
   function renderConfusionMatrix(matrix, classOrder) {
     if(!Array.isArray(matrix)||!matrix.length) return '<p class="mut">Confusion matrix is not available for this model.</p>';
     const labels=Array.isArray(classOrder)&&classOrder.length?classOrder:['N','S','V','F','Q'];
@@ -90,7 +88,7 @@
         ${renderConfusionMatrix(m.confusion_matrix,m.class_order||['N','S','V','F','Q'])}
       </section>`).join('');
     const lowSupport=Object.entries(trainDist).filter(([,count])=>Number(count)<20);
-    const artifacts=(summary.artifacts||[]).filter(name=>/\\.(csv|json|md)$/i.test(name));
+    const artifacts=(summary.artifacts||[]).filter(name=>/\.(csv|json|md)$/i.test(name));
     return `${keyValueGrid([
       ['Training beats',summary.n_train],['Testing beats',summary.n_test],['Input features',summary.n_features],
       ['Training patients',summary.n_train_patients],['Testing patients',summary.n_test_patients],
